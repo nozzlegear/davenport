@@ -3,3 +3,4 @@ bin/tests/
 node_modules/
 tsconfig.json
 *.tgz
+*.log
