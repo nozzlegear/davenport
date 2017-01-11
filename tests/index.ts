@@ -103,22 +103,39 @@ export class DavenportTestFixture {
         Expect(result.hello).toBe("world");
     }
 
-    @AsyncTest("Davenport.list")
+    @AsyncTest("Davenport.listWithDocs")
     @Timeout(5000)
-    public async listTest() {
+    public async listWithDocsTest() {
         const client = new Client<TestObject>(DB_URL, DB_NAME);
-        const list = await client.list();
+        const list = await client.listWithDocs();
 
         Expect(list.offset).toBe(0);
         Expect(Array.isArray(list.rows)).toBe(true);
         Expect(list.total_rows).toBeGreaterThan(0);
-        Expect(list.rows.every(r =>
-            !!r &&
-            typeof (r.bar) === "number" &&
-            typeof (r.foo) === "number" &&
-            typeof (r.hello) === "string" &&
-            typeof (r._id) === "string" &&
-            typeof (r._rev) === "string")).toBe(true);
+        Expect(list.rows.every(r => {
+            if (r._id.indexOf("_design") > -1) {
+                return true;
+            }
+
+            return !!r &&
+                typeof (r.bar) === "number" &&
+                typeof (r.foo) === "number" &&
+                typeof (r.hello) === "string" &&
+                typeof (r._id) === "string" &&
+                typeof (r._rev) === "string";
+        })).toBe(true);
+    }
+
+    @AsyncTest("Davenport.listWithoutDocs")
+    @Timeout(5000)
+    public async listWithoutDocsTest() {
+        const client = new Client<TestObject>(DB_URL, DB_NAME);
+        const list = await client.listWithoutDocs();
+
+        Expect(list.offset).toBe(0);
+        Expect(Array.isArray(list.rows)).toBe(true);
+        Expect(list.total_rows).toBeGreaterThan(0);
+        Expect(list.rows.every(r => typeof(r.rev) === "string" && typeof(r["id"]) === "undefined" )).toBe(true);
     }
 
     @AsyncTest("Davenport.count")
@@ -180,7 +197,7 @@ export class DavenportTestFixture {
             foo: 4,
             hello: "world"
         });
-        const exists = await client.exists(createResult.id, "_id");
+        const exists = await client.exists(createResult.id);
 
         Expect(exists).toBe(true);
     }
@@ -195,7 +212,7 @@ export class DavenportTestFixture {
             foo: 4,
             hello: uuid,
         })
-        const exists = await client.exists(uuid, "hello");
+        const exists = await client.existsBySelector(uuid, "hello");
 
         Expect(exists).toBe(true);
     }
@@ -244,8 +261,6 @@ export class DavenportTestFixture {
     public async viewTest() {
         const client = new Client<TestObject>(DB_URL, DB_NAME);
         const result = await client.view(designDoc.name, designDoc.views[0].name);
-
-        inspect(".view result", result);
 
         Expect(Array.isArray(result.rows)).toBe(true);
     }

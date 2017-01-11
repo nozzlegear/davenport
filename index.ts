@@ -16,16 +16,25 @@ function isOkay(response: AxiosResponse) {
     return response.status >= 200 && response.status < 300;
 }
 
+/**
+ * Determines whether an object is a DavenportError.
+ */
 export function isDavenportError(error): error is DavenportError {
     return error.isDavenport;
 }
 
+/**
+ * A generic view document for listing and counting all objects in the database.
+ */
 export const GENERIC_LIST_VIEW = {
     "name": "all",
     "map": function (doc) { emit(doc._id, doc); }.toString(),
     "reduce": "_count"
 }
 
+/**
+ * Configures a Davenport client and database by validating the CouchDB version, creating indexes and design documents, and then returning a client to interact with the database.
+ */
 export default async function configureClient<T extends CouchDoc>(databaseUrl: string, configuration: DatabaseConfiguration): Promise<Client<T>> {
     const dbInfo = await Axios.get(databaseUrl);
 
@@ -123,6 +132,9 @@ export default async function configureClient<T extends CouchDoc>(databaseUrl: s
     return new Client<T>(databaseUrl, configuration.name);
 }
 
+/**
+ * A client for interacting with a CouchDB instance. Use this when you don't want or need to use the `configureClient` function to create a database and set up design docs or indexes.
+ */
 export class Client<T extends CouchDoc> {
     constructor(private baseUrl: string, private databaseName: string) {
         this.databaseUrl = `${baseUrl}/${databaseName}/`;
@@ -130,13 +142,12 @@ export class Client<T extends CouchDoc> {
 
     private databaseUrl: string;
 
+    /**
+     * Checks that the Axios response is okay. If not, a DavenPort error is thrown.
+     */
     private async checkErrorAndGetBody(result: AxiosResponse) {
         if (!isOkay(result)) {
             const message = `Error with ${result.config.method} request for CouchDB database ${this.databaseName} at ${result.config.url}. ${result.status} ${result.statusText}`;
-
-            if (result.status !== 404) {
-                inspect(message, result.data);
-            }
 
             throw new DavenportError(message, result);
         }
@@ -144,6 +155,9 @@ export class Client<T extends CouchDoc> {
         return result.data;
     };
 
+    /**
+     * Find matching documents according to the selector.
+     */
     public async find(options: FindOptions<T>): Promise<T[]> {
         const result = await Axios.post(`${this.databaseUrl}/_find`, options, {
             headers: {
@@ -160,9 +174,28 @@ export class Client<T extends CouchDoc> {
         return body.docs;
     }
 
-    public async list(options: ListOptions = {}): Promise<ListResponse<T>> {
+    /**
+     * Lists documents in the database. Warning: this result WILL list design documents, and it will force the `include_docs` option to false. If you need to include docs, use .listWithDocs.
+     */
+    public async listWithoutDocs(options: ListOptions = {}): Promise<ListResponse<{ rev: string }>> {
         const result = await Axios.get(`${this.databaseUrl}/_all_docs`, {
-            params: options
+            params: { ...options, include_docs: false }
+        });
+        const body = await this.checkErrorAndGetBody(result) as AllDocsListResult<T>;
+
+        return {
+            offset: body.offset,
+            total_rows: body.total_rows,
+            rows: body.rows.map(r => r.value)
+        }
+    }
+
+    /**
+     * Lists documents in the database. Warning: this result WILL list design documents, and it will force the `include_docs` option to true. If you don't need to include docs, use .listWithoutDocs.
+     */
+    public async listWithDocs(options: ListOptions = {}): Promise<ListResponse<T>> {
+        const result = await Axios.get(`${this.databaseUrl}/_all_docs`, {
+            params: { ...options, include_docs: true }
         });
         const body = await this.checkErrorAndGetBody(result) as AllDocsListResult<T>;
 
@@ -173,6 +206,9 @@ export class Client<T extends CouchDoc> {
         }
     }
 
+    /**
+     * Counts all documents in the database. Warning: this result WILL include design documents.
+     */
     public async count(): Promise<number> {
         const result = await Axios.get(`${this.databaseUrl}/_all_docs`, {
             params: {
@@ -184,6 +220,9 @@ export class Client<T extends CouchDoc> {
         return body.total_rows;
     }
 
+    /**
+     * Counts all documents by the given selector. Warning: this uses more memory than a regular count, because it needs to pull in the _id field of all selected documents. For large queries, it's better to create a dedicated view and use the .view function.
+     */
     public async countBySelector(selector: Partial<T>): Promise<number> {
         const result = await this.find({
             fields: ["_id"],
@@ -193,6 +232,9 @@ export class Client<T extends CouchDoc> {
         return result.length;
     }
 
+    /**
+     * Gets a document with the given id and optional revision id.
+     */
     public async get(id: string, rev?: string): Promise<T> {
         const result = await Axios.get(this.databaseUrl + id, {
             params: { rev }
@@ -202,6 +244,9 @@ export class Client<T extends CouchDoc> {
         return body;
     }
 
+    /**
+     * Creates a document with a random id. By CouchDB convention, this will only return the id and revision id of the new document, not the document itself.
+     */
     public async post(data: T): Promise<PostPutCopyResponse> {
         const result = await Axios.post(this.databaseUrl, data, {
             headers: {
@@ -216,6 +261,9 @@ export class Client<T extends CouchDoc> {
         }
     }
 
+    /**
+     * Updates or creates a document with the given id. By CouchDB convention, this will only return the id and revision id of the new document, not the document itself.
+     */
     public async put(id: string, data: T, rev: string): Promise<PostPutCopyResponse> {
         if (!rev) {
             inspect(`Davenport warning: no revision specified for Davenport.put function with id ${id}. This may cause a document conflict error.`);
@@ -235,6 +283,9 @@ export class Client<T extends CouchDoc> {
         };
     }
 
+    /**
+     * Copies the document with the given id and assigns the new id to the copy. By CouchDB convention, this will only return the id and revision id of the new document, not the document itself.
+     */
     public async copy(id: string, newId: string): Promise<PostPutCopyResponse> {
         const result = await Axios.request({
             url: this.databaseUrl + id,
@@ -251,6 +302,9 @@ export class Client<T extends CouchDoc> {
         }
     }
 
+    /**
+     * Deletes the document with the given id and revision id.
+     */
     public async delete(id: string, rev: string): Promise<void> {
         if (!rev) {
             inspect(`Davenport warning: no revision specified for Davenport.delete function with id ${id}. This may cause a document conflict error.`);
@@ -263,25 +317,34 @@ export class Client<T extends CouchDoc> {
         await this.checkErrorAndGetBody(result);
     }
 
-    public async exists(id: string, field: keyof T): Promise<boolean> {
-        if (!field || field === "_id") {
-            const result = await Axios.head(this.databaseUrl + id);
+    /**
+     * Checks that a document with the given id exists.
+     */
+    public async exists(id: string): Promise<boolean> {
+        const result = await Axios.head(this.databaseUrl + id);
 
-            return result.status === 200;
-        }
+        return result.status === 200;
+    }
 
+    /**
+     * Checks that a document that matches the field value exists.
+     */
+    public async existsBySelector(value, field: keyof T): Promise<boolean> {
         const findResult = await this.find({
             fields: ["_id"],
             limit: 1,
             selector: {
-                [field]: id
+                [field]: value
             } as any
         });
 
         return findResult.length > 0;
     }
 
-    public async view<R>(designDocName: string, viewName: string, options: ViewOptions = {}): Promise<{rows: R[]}> {
+    /**
+     * Executes a view with the given designDocName and viewName. 
+     */
+    public async view<R>(designDocName: string, viewName: string, options: ViewOptions = {}): Promise<{ rows: R[] }> {
         const result = await Axios.get(`${this.databaseUrl}_design/${designDocName}/_view/${viewName}`, {
             params: options,
         });
@@ -394,7 +457,7 @@ export interface DesignDoc extends CouchDoc {
 
 export interface DesignDocConfiguration {
     name: string,
-    views: ({name: string} & CouchDBView)[]
+    views: ({ name: string } & CouchDBView)[]
 }
 
 export interface DatabaseConfiguration {
