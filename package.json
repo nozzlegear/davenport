@@ -6,7 +6,8 @@
   "typings": "bin/index.d.ts",
   "scripts": {
     "build": "tsc -p .",
-    "test": "npm run build && alsatian -T ./bin/tests/index.js | tap-bark"
+    "test": "npm run build && alsatian -T ./bin/tests/index.js | tap-bark",
+    "publish": "npm run build"
   },
   "repository": {
     "type": "git",
