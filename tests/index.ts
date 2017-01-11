@@ -1,6 +1,6 @@
 import inspect from "logspect";
 import { Expect, AsyncTest, Timeout, TestFixture } from "alsatian";
-import configureDatabase, { Client, CouchDoc, DesignDocConfiguration } from "../";
+import Client, { configureDatabase, CouchDoc, DesignDocConfiguration } from "../";
 
 const DB_URL = "http://localhost:5984";
 const DB_NAME = "davenport_tests";

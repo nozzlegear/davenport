@@ -35,7 +35,7 @@ export const GENERIC_LIST_VIEW = {
 /**
  * Configures a Davenport client and database by validating the CouchDB version, creating indexes and design documents, and then returning a client to interact with the database.
  */
-export default async function configureClient<T extends CouchDoc>(databaseUrl: string, configuration: DatabaseConfiguration): Promise<Client<T>> {
+export async function configureDatabase<T extends CouchDoc>(databaseUrl: string, configuration: DatabaseConfiguration): Promise<Client<T>> {
     const dbInfo = await Axios.get(databaseUrl);
 
     if (!isOkay(dbInfo)) {
@@ -353,6 +353,8 @@ export class Client<T extends CouchDoc> {
         return body;
     }
 }
+
+export default Client;
 
 export class DavenportError extends Error {
     constructor(message, public fullResponse: AxiosResponse) {
