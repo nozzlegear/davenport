@@ -344,7 +344,7 @@ export class Client<T extends CouchDoc> {
     /**
      * Executes a view with the given designDocName and viewName. 
      */
-    public async view<R>(designDocName: string, viewName: string, options: ViewOptions = {}): Promise<{ rows: R[] }> {
+    public async view<R>(designDocName: string, viewName: string, options: ViewOptions = {}): Promise<{ offset?: number, total_rows?: number, rows: R[] }> {
         const result = await Axios.get(`${this.databaseUrl}_design/${designDocName}/_view/${viewName}`, {
             params: options,
         });

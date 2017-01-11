@@ -1,6 +1,6 @@
 {
   "name": "davenport",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "A CouchDB client for simplifying common tasks like get, list, create, update and delete. Comes complete with full TypeScript definitions.",
   "main": "bin/index.js",
   "typings": "bin/index.d.ts",
