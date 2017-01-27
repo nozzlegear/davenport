@@ -35,7 +35,7 @@ export const GENERIC_LIST_VIEW = {
 /**
  * Configures a Davenport client and database by validating the CouchDB version, creating indexes and design documents, and then returning a client to interact with the database.
  */
-export async function configureDatabase<T extends CouchDoc>(databaseUrl: string, configuration: DatabaseConfiguration): Promise<Client<T>> {
+export async function configureDatabase<T extends CouchDoc>(databaseUrl: string, configuration: DatabaseConfiguration, options?: ClientOptions): Promise<Client<T>> {
     const dbInfo = await Axios.get(databaseUrl);
 
     if (!isOkay(dbInfo)) {
@@ -129,18 +129,26 @@ export async function configureDatabase<T extends CouchDoc>(databaseUrl: string,
         })
     };
 
-    return new Client<T>(databaseUrl, configuration.name);
+    return new Client<T>(databaseUrl, configuration.name, options);
 }
 
 /**
  * A client for interacting with a CouchDB instance. Use this when you don't want or need to use the `configureClient` function to create a database and set up design docs or indexes.
  */
 export class Client<T extends CouchDoc> {
-    constructor(private baseUrl: string, private databaseName: string) {
+    constructor(private baseUrl: string, private databaseName: string, private options: ClientOptions = { warnings: true }) {
         this.databaseUrl = `${baseUrl}/${databaseName}/`;
     }
 
     private databaseUrl: string;
+
+    private getOption(name: keyof ClientOptions) {
+        if (!this.options) {
+            return undefined;
+        }
+
+        return this.options[name];
+    }
 
     /**
      * Checks that the Axios response is okay. If not, a DavenPort error is thrown.
@@ -167,7 +175,7 @@ export class Client<T extends CouchDoc> {
 
         const body = await this.checkErrorAndGetBody(result);
 
-        if (body.warning) {
+        if (body.warning && !!this.getOption("warnings")) {
             inspect("Davenport warning: Davenport.find result contained warning:", body.warning);
         }
 
@@ -265,7 +273,7 @@ export class Client<T extends CouchDoc> {
      * Updates or creates a document with the given id. By CouchDB convention, this will only return the id and revision id of the new document, not the document itself.
      */
     public async put(id: string, data: T, rev: string): Promise<PostPutCopyResponse> {
-        if (!rev) {
+        if (!rev && !! this.getOption("warnings")) {
             inspect(`Davenport warning: no revision specified for Davenport.put function with id ${id}. This may cause a document conflict error.`);
         }
 
@@ -306,7 +314,7 @@ export class Client<T extends CouchDoc> {
      * Deletes the document with the given id and revision id.
      */
     public async delete(id: string, rev: string): Promise<void> {
-        if (!rev) {
+        if (!rev && !!this.getOption("warnings")) {
             inspect(`Davenport warning: no revision specified for Davenport.delete function with id ${id}. This may cause a document conflict error.`);
         }
 
@@ -466,4 +474,11 @@ export interface DatabaseConfiguration {
     name: string,
     indexes?: string[],
     designDocs?: DesignDocConfiguration[],
+}
+
+export interface ClientOptions {
+    /**
+     * Whether the Davenport client should log warnings.
+     */
+    warnings: boolean;
 }
