@@ -1,11 +1,12 @@
 {
   "name": "davenport",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "A CouchDB client for simplifying common tasks like get, list, create, update and delete. Comes complete with full TypeScript definitions.",
   "main": "bin/index.js",
   "typings": "bin/index.d.ts",
   "scripts": {
-    "build": "rimraf ./bin && tsc -p .",
+    "build": "rimraf ./bin && tsc -p . && npm run webpack",
+    "webpack": "webpack bin/index.js bin/browser.js --output-library Davenport",
     "test": "npm run build && alsatian -T ./bin/tests/index.js | tap-bark",
     "prepublish": "npm run build"
   },
@@ -38,6 +39,7 @@
     "alsatian": "^1.0.1",
     "rimraf": "^2.5.4",
     "tap-bark": "^1.0.0",
-    "typescript": "^2.1.4"
+    "typescript": "^2.1.4",
+    "webpack": "^2.2.1"
   }
 }

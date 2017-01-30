@@ -4,7 +4,14 @@ Davenport is a CouchDB client for simplifying common tasks like get, list, creat
 
 ## Installing
 
+You can install Davenport with either npm or [Yarn](https://yarnpkg.com):
 
+```bash
+npm install davenport --save
+
+# Or use Yarn
+yarn add davenport
+```
 
 ## Importing
 
@@ -17,6 +24,14 @@ import Client from "davenport";
 // require
 const Client = require("davenport").Client;
 ```
+
+### Using Davenport in the browser
+
+Davenport can be used in the browser, so long as you transpile the async functions with TypeScript or Babel. Just add the **node_modules/davenport/bin/browser.js** to your web page, and all functions/objects documented below will be available under the `Davenport` variable. 
+
+Make sure your CouchDB installation is [configured to allow cross-origin resource sharing (CORS)](https://wiki.apache.org/couchdb/CORS), otherwise Davenport won't be able to connect!
+
+![Enable CORS](https://imgur.com/a/7DGsE)
 
 ## Async/await and promises
 
