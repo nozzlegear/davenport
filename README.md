@@ -31,7 +31,7 @@ Davenport can be used in the browser, so long as you transpile the async functio
 
 Make sure your CouchDB installation is [configured to allow cross-origin resource sharing (CORS)](https://wiki.apache.org/couchdb/CORS), otherwise Davenport won't be able to connect!
 
-![Enable CORS](https://imgur.com/a/7DGsE)
+![Enable CORS](https://i.imgur.com/E63QDdh.jpg)
 
 ## Async/await and promises
 
