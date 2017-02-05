@@ -472,7 +472,7 @@ export interface DesignDocConfiguration {
 
 export interface DatabaseConfiguration<T> {
     name: string,
-    indexes?: keyof T[],
+    indexes?: (keyof T)[],
     designDocs?: DesignDocConfiguration[],
 }
 
