@@ -35,7 +35,7 @@ export const GENERIC_LIST_VIEW = {
 /**
  * Configures a Davenport client and database by validating the CouchDB version, creating indexes and design documents, and then returning a client to interact with the database.
  */
-export async function configureDatabase<T extends CouchDoc>(databaseUrl: string, configuration: DatabaseConfiguration, options?: ClientOptions): Promise<Client<T>> {
+export async function configureDatabase<T extends CouchDoc>(databaseUrl: string, configuration: DatabaseConfiguration<T>, options?: ClientOptions): Promise<Client<T>> {
     const dbInfo = await Axios.get(databaseUrl);
 
     if (!isOkay(dbInfo)) {
@@ -470,9 +470,9 @@ export interface DesignDocConfiguration {
     views: ({ name: string } & CouchDBView)[]
 }
 
-export interface DatabaseConfiguration {
+export interface DatabaseConfiguration<T> {
     name: string,
-    indexes?: string[],
+    indexes?: keyof T[],
     designDocs?: DesignDocConfiguration[],
 }
 
