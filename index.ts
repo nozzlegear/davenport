@@ -75,7 +75,7 @@ export async function configureDatabase<T extends CouchDoc>(databaseUrl: string,
     }
 
     if (Array.isArray(configuration.designDocs) && configuration.designDocs.length > 0) {
-        configuration.designDocs.forEach(async designDoc => {
+        await Promise.all(configuration.designDocs.map(async designDoc => {
             const url = `${databaseUrl}/${configuration.name}/_design/${designDoc.name}`;
             const getDoc = await Axios.get(url);
             const okay = isOkay(getDoc);
@@ -83,7 +83,6 @@ export async function configureDatabase<T extends CouchDoc>(databaseUrl: string,
 
             if (!isOkay && getDoc.status !== 404) {
                 inspect(`Davenport: Failed to retrieve design doc "${designDoc.name}". ${getDoc.status} ${getDoc.statusText}`, getDoc.data);
-
                 return;
             }
 
@@ -126,8 +125,10 @@ export async function configureDatabase<T extends CouchDoc>(databaseUrl: string,
                     inspect(`Davenport: Could not create or update CouchDB design doc "${designDoc.name}". ${result.status} ${result.statusText}`, result.data);
                 }
             }
-        })
-    };
+
+            return Promise.resolve();
+        }));
+    }
 
     return new Client<T>(databaseUrl, configuration.name, options);
 }
