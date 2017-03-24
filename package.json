@@ -39,7 +39,7 @@
     "alsatian": "^1.0.1",
     "rimraf": "^2.5.4",
     "tap-bark": "^1.0.0",
-    "typescript": "^2.1.4",
+    "typescript": "^2.2.1",
     "webpack": "^2.2.1"
   }
 }
