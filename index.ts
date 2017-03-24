@@ -364,6 +364,7 @@ export class Client<T extends CouchDoc> {
 
     private encodeOptions(options: ListOptions) : object {
         let requestOptions = {};
+
         for (var key in options) {
             if (key == "keys" || key == "key" || key == "startkey" || key == "endkey") {
                 requestOptions[key] = JSON.stringify(options[key]);
@@ -371,6 +372,7 @@ export class Client<T extends CouchDoc> {
                 requestOptions[key] = options[key];
             }
         }
+        
         return requestOptions;
     }
 }
