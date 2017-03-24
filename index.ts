@@ -188,7 +188,7 @@ export class Client<T extends CouchDoc> {
      */
     public async listWithoutDocs(options: ListOptions = {}): Promise<ListResponse<{ rev: string }>> {
         const result = await Axios.get(`${this.databaseUrl}/_all_docs`, {
-            params: { ...options, include_docs: false }
+            params: { ...this.encodeOptions(options), include_docs: false }
         });
         const body = await this.checkErrorAndGetBody(result) as AllDocsListResult<T>;
 
@@ -204,7 +204,7 @@ export class Client<T extends CouchDoc> {
      */
     public async listWithDocs(options: ListOptions = {}): Promise<ListResponse<T>> {
         const result = await Axios.get(`${this.databaseUrl}/_all_docs`, {
-            params: { ...options, include_docs: true }
+            params: { ...this.encodeOptions(options), include_docs: true }
         });
         const body = await this.checkErrorAndGetBody(result) as AllDocsListResult<T>;
 
@@ -355,11 +355,23 @@ export class Client<T extends CouchDoc> {
      */
     public async view<R>(designDocName: string, viewName: string, options: ViewOptions = {}): Promise<{ offset?: number, total_rows?: number, rows: R[] }> {
         const result = await Axios.get(`${this.databaseUrl}_design/${designDocName}/_view/${viewName}`, {
-            params: options,
+            params: this.encodeOptions(options),
         });
         const body = await this.checkErrorAndGetBody(result);
 
         return body;
+    }
+
+    private encodeOptions(options: ListOptions) : object {
+        let requestOptions = {};
+        for (var key in options) {
+            if (key == "keys" || key == "key" || key == "startkey" || key == "endkey") {
+                requestOptions[key] = JSON.stringify(options[key]);
+            } else {
+                requestOptions[key] = options[key];
+            }
+        }
+        return requestOptions;
     }
 }
 
@@ -414,6 +426,7 @@ export interface ViewOptions extends ListOptions {
  */
 export interface ListOptions {
     limit?: number;
+    key?: string;
     keys?: string[];
     start_key?: string | number;
     end_key?: string | number;
