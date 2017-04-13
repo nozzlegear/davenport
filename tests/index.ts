@@ -1,6 +1,6 @@
 import inspect from "logspect";
 import { Expect, AsyncTest, Timeout, TestFixture } from "alsatian";
-import Client, { configureDatabase, CouchDoc, DesignDocConfiguration } from "../";
+import Client, { configureDatabase, CouchDoc, DesignDocConfiguration, PropSelector } from "../";
 
 const DB_URL = "http://localhost:5984";
 const DB_NAME = "davenport_tests";
@@ -168,6 +168,29 @@ export class DavenportTestFixture {
         Expect(count).toBe(3);
     }
 
+    @AsyncTest("Davenport.count with selector indexes")
+    @Timeout(5000)
+    public async countWithSelectorIndexesTest() {
+        const client = new Client<TestObject>(DB_URL, DB_NAME);
+        const uuid = `a-unique-string-${Date.now()}`;
+
+        for (let i = 0; i < 3; i++) {
+            await client.post({
+                bar: i,
+                foo: i + 1,
+                hello: uuid
+            })
+        };
+
+        const count = await client.countBySelector({
+            hello: {
+                $eq: uuid
+            }
+        });
+
+        Expect(count).toBe(3);
+    }
+
     @AsyncTest("Davenport.delete")
     @Timeout(5000)
     public async deleteTest() {
@@ -202,6 +225,21 @@ export class DavenportTestFixture {
         Expect(exists).toBe(true);
     }
 
+    @AsyncTest("Davenport.exists with field value")
+    @Timeout(5000)
+    public async existsWithFieldValueTest() {
+        const client = new Client<TestObject>(DB_URL, DB_NAME);
+        const uuid = `a-unique-string-${Date.now()}`;
+        const createResult = await client.post({
+            bar: 5,
+            foo: 4,
+            hello: uuid,
+        })
+        const exists = await client.existsByFieldValue(uuid, "hello");
+
+        Expect(exists).toBe(true);
+    }
+
     @AsyncTest("Davenport.exists with selector")
     @Timeout(5000)
     public async existsWithSelectorTest() {
@@ -212,7 +250,11 @@ export class DavenportTestFixture {
             foo: 4,
             hello: uuid,
         })
-        const exists = await client.existsBySelector(uuid, "hello");
+        const exists = await client.existsBySelector({
+            hello: {
+                $eq: uuid
+            }
+        });
 
         Expect(exists).toBe(true);
     }

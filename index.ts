@@ -35,7 +35,7 @@ export const GENERIC_LIST_VIEW = {
 /**
  * Configures a Davenport client and database by validating the CouchDB version, creating indexes and design documents, and then returning a client to interact with the database.
  */
-export async function configureDatabase<T extends CouchDoc>(databaseUrl: string, configuration: DatabaseConfiguration<T>, options?: ClientOptions): Promise<Client<T>> {
+export async function configureDatabase<DocType extends CouchDoc>(databaseUrl: string, configuration: DatabaseConfiguration<DocType>, options?: ClientOptions): Promise<Client<DocType>> {
     const dbInfo = await Axios.get(databaseUrl);
 
     if (!isOkay(dbInfo)) {
@@ -130,7 +130,7 @@ export async function configureDatabase<T extends CouchDoc>(databaseUrl: string,
         }));
     }
 
-    return new Client<T>(databaseUrl, configuration.name, options);
+    return new Client<DocType>(databaseUrl, configuration.name, options);
 }
 
 /**
@@ -232,7 +232,9 @@ export class Client<T extends CouchDoc> {
     /**
      * Counts all documents by the given selector. Warning: this uses more memory than a regular count, because it needs to pull in the _id field of all selected documents. For large queries, it's better to create a dedicated view and use the .view function.
      */
-    public async countBySelector(selector: Partial<T>): Promise<number> {
+    public async countBySelector(selector: DocSelector<T>): Promise<number>
+    public async countBySelector(selector: Partial<T>): Promise<number>
+    public async countBySelector(selector): Promise<number> {
         const result = await this.find({
             fields: ["_id"],
             selector,
@@ -338,13 +340,26 @@ export class Client<T extends CouchDoc> {
     /**
      * Checks that a document that matches the field value exists.
      */
-    public async existsBySelector(value, field: keyof T): Promise<boolean> {
+    public async existsByFieldValue(value, field: keyof T): Promise<boolean> {
         const findResult = await this.find({
             fields: ["_id"],
             limit: 1,
             selector: {
                 [field]: value
             } as any
+        });
+
+        return findResult.length > 0;
+    }
+
+    /**
+     * Checks that a document matching the selector exists.
+     */
+    public async existsBySelector(selector: DocSelector<T>): Promise<boolean> {
+        const findResult = await this.find({
+            fields: ["_id"],
+            limit: 1,
+            selector: selector as any,
         });
 
         return findResult.length > 0;
@@ -468,7 +483,7 @@ export interface FindOptions<T> {
     limit?: number;
     skip?: number;
     use_index?: Object;
-    selector: Partial<T>;
+    selector: Partial<T> | DocSelector<T>;
 }
 
 export interface CouchDBView {
@@ -498,3 +513,37 @@ export interface ClientOptions {
      */
     warnings: boolean;
 }
+
+export interface PropSelector {
+    /**
+     * Property is equal to this value.
+     */
+    $eq?: any;
+
+    /**
+     * Property is not equal to this value.
+     */
+    $ne?: any;
+    
+    /**
+     * Property is greater than this value.
+     */
+    $gt?: any;
+
+    /**
+     * Property is greater than or equal to this value.
+     */
+    $gte?: any;
+
+    /**
+     * Property is less than this value.
+     */
+    $lt?: any;
+
+    /**
+     * Property is lesser than or equal to this value.
+     */
+    $lte?: any;
+}
+
+export type DocSelector<T> = Partial<Record<keyof T, PropSelector>>;
