@@ -1,11 +1,5 @@
 import inspect from "logspect";
-import AxiosLib, { AxiosResponse, } from "axios";
-
-// Create an instance of Axios using our own defaults
-const Axios = AxiosLib.create({
-    // Like fetch, Axios should never throw an error if it receives a response
-    validateStatus: (status) => true
-})
+import AxiosLib, { AxiosResponse, AxiosBasicCredentials, AxiosRequestConfig, AxiosInstance } from "axios";
 
 declare const emit: (key: string, value) => void;
 
@@ -33,10 +27,33 @@ export const GENERIC_LIST_VIEW = {
 }
 
 /**
+ * Configures an instance of Axios with auth and validation defaults.
+ */
+function getAxiosInstance (options: ClientOptions): AxiosInstance {
+    let auth: AxiosBasicCredentials;
+
+    if (options && (options.username || options.password)) {
+        auth = {
+            username: options.username,
+            password: options.password,
+        }
+    }
+
+    const instance = AxiosLib.create({
+        // Like fetch, Axios should never throw an error if it receives a response
+        validateStatus: (status) => true,
+        auth: auth,
+    });
+
+    return instance;
+}
+
+/**
  * Configures a Davenport client and database by validating the CouchDB version, creating indexes and design documents, and then returning a client to interact with the database.
  */
 export async function configureDatabase<DocType extends CouchDoc>(databaseUrl: string, configuration: DatabaseConfiguration<DocType>, options?: ClientOptions): Promise<Client<DocType>> {
-    const dbInfo = await Axios.get(databaseUrl);
+    const ax = getAxiosInstance(options);
+    const dbInfo = await ax.get(databaseUrl);
 
     if (!isOkay(dbInfo)) {
         throw new Error(`Failed to connect to CouchDB instance at ${databaseUrl}. ${dbInfo.status} ${dbInfo.statusText}`);
@@ -49,7 +66,7 @@ export async function configureDatabase<DocType extends CouchDoc>(databaseUrl: s
         inspect(`Warning: Davenport expects your CouchDB instance to be running CouchDB 2.0 or higher. Version detected: ${version}. Some database methods may not work.`)
     }
 
-    const putResult = await Axios.put(`${databaseUrl}/${configuration.name}`);
+    const putResult = await ax.put(`${databaseUrl}/${configuration.name}`, undefined);
     const preconditionFailed = 412; /* Precondition Failed - Database already exists. */
 
     if (putResult.status !== preconditionFailed && !isOkay(putResult)) {
@@ -63,7 +80,7 @@ export async function configureDatabase<DocType extends CouchDoc>(databaseUrl: s
             },
             name: `${configuration.name}-indexes`,
         };
-        const result = await Axios.post(`${databaseUrl}/${configuration.name}/_index`, data, {
+        const result = await ax.post(`${databaseUrl}/${configuration.name}/_index`, data, {
             headers: {
                 "Content-Type": "application/json"
             },
@@ -77,7 +94,7 @@ export async function configureDatabase<DocType extends CouchDoc>(databaseUrl: s
     if (Array.isArray(configuration.designDocs) && configuration.designDocs.length > 0) {
         await Promise.all(configuration.designDocs.map(async designDoc => {
             const url = `${databaseUrl}/${configuration.name}/_design/${designDoc.name}`;
-            const getDoc = await Axios.get(url);
+            const getDoc = await ax.get(url);
             const okay = isOkay(getDoc);
             let docFromDatabase: DesignDoc;
 
@@ -115,7 +132,7 @@ export async function configureDatabase<DocType extends CouchDoc>(databaseUrl: s
             if (shouldUpdate) {
                 inspect(`Davenport: Creating or updating design doc "${designDoc.name}".`);
 
-                const result = await Axios.put(url, docFromDatabase, {
+                const result = await ax.put(url, docFromDatabase, {
                     headers: {
                         "Content-Type": "application/json",
                     }
@@ -139,7 +156,10 @@ export async function configureDatabase<DocType extends CouchDoc>(databaseUrl: s
 export class Client<T extends CouchDoc> {
     constructor(private baseUrl: string, private databaseName: string, private options: ClientOptions = { warnings: true }) {
         this.databaseUrl = `${baseUrl}/${databaseName}/`;
+        this.axios = getAxiosInstance(options);
     }
+
+    private axios: AxiosInstance;
 
     private databaseUrl: string;
 
@@ -168,7 +188,7 @@ export class Client<T extends CouchDoc> {
      * Find matching documents according to the selector.
      */
     public async find(options: FindOptions<T>): Promise<T[]> {
-        const result = await Axios.post(`${this.databaseUrl}/_find`, options, {
+        const result = await this.axios.post(`${this.databaseUrl}/_find`, options, {
             headers: {
                 "Content-Type": "application/json"
             },
@@ -187,7 +207,7 @@ export class Client<T extends CouchDoc> {
      * Lists documents in the database. Warning: this result WILL list design documents, and it will force the `include_docs` option to false. If you need to include docs, use .listWithDocs.
      */
     public async listWithoutDocs(options: ListOptions = {}): Promise<ListResponse<{ rev: string }>> {
-        const result = await Axios.get(`${this.databaseUrl}/_all_docs`, {
+        const result = await this.axios.get(`${this.databaseUrl}/_all_docs`, {
             params: { ...this.encodeOptions(options), include_docs: false }
         });
         const body = await this.checkErrorAndGetBody(result) as AllDocsListResult<T>;
@@ -203,7 +223,7 @@ export class Client<T extends CouchDoc> {
      * Lists documents in the database. Warning: this result WILL list design documents, and it will force the `include_docs` option to true. If you don't need to include docs, use .listWithoutDocs.
      */
     public async listWithDocs(options: ListOptions = {}): Promise<ListResponse<T>> {
-        const result = await Axios.get(`${this.databaseUrl}/_all_docs`, {
+        const result = await this.axios.get(`${this.databaseUrl}/_all_docs`, {
             params: { ...this.encodeOptions(options), include_docs: true }
         });
         const body = await this.checkErrorAndGetBody(result) as AllDocsListResult<T>;
@@ -219,7 +239,7 @@ export class Client<T extends CouchDoc> {
      * Counts all documents in the database. Warning: this result WILL include design documents.
      */
     public async count(): Promise<number> {
-        const result = await Axios.get(`${this.databaseUrl}/_all_docs`, {
+        const result = await this.axios.get(`${this.databaseUrl}/_all_docs`, {
             params: {
                 limit: 0,
             }
@@ -247,7 +267,7 @@ export class Client<T extends CouchDoc> {
      * Gets a document with the given id and optional revision id.
      */
     public async get(id: string, rev?: string): Promise<T> {
-        const result = await Axios.get(this.databaseUrl + id, {
+        const result = await this.axios.get(this.databaseUrl + id, {
             params: { rev }
         });
         const body = await this.checkErrorAndGetBody(result);
@@ -259,7 +279,7 @@ export class Client<T extends CouchDoc> {
      * Creates a document with a random id. By CouchDB convention, this will only return the id and revision id of the new document, not the document itself.
      */
     public async post(data: T): Promise<PostPutCopyResponse> {
-        const result = await Axios.post(this.databaseUrl, data, {
+        const result = await this.axios.post(this.databaseUrl, data, {
             headers: {
                 "Content-Type": "application/json"
             },
@@ -280,7 +300,7 @@ export class Client<T extends CouchDoc> {
             inspect(`Davenport warning: no revision specified for Davenport.put function with id ${id}. This may cause a document conflict error.`);
         }
 
-        const result = await Axios.put(this.databaseUrl + id, data, {
+        const result = await this.axios.put(this.databaseUrl + id, data, {
             headers: {
                 "Content-Type": "application/json"
             },
@@ -298,7 +318,7 @@ export class Client<T extends CouchDoc> {
      * Copies the document with the given id and assigns the new id to the copy. By CouchDB convention, this will only return the id and revision id of the new document, not the document itself.
      */
     public async copy(id: string, newId: string): Promise<PostPutCopyResponse> {
-        const result = await Axios.request({
+        const result = await this.axios.request({
             url: this.databaseUrl + id,
             method: "COPY",
             headers: {
@@ -321,7 +341,7 @@ export class Client<T extends CouchDoc> {
             inspect(`Davenport warning: no revision specified for Davenport.delete function with id ${id}. This may cause a document conflict error.`);
         }
 
-        const result = await Axios.delete(this.databaseUrl + id, {
+        const result = await this.axios.delete(this.databaseUrl + id, {
             params: { rev }
         });
 
@@ -332,7 +352,7 @@ export class Client<T extends CouchDoc> {
      * Checks that a document with the given id exists.
      */
     public async exists(id: string): Promise<boolean> {
-        const result = await Axios.head(this.databaseUrl + id);
+        const result = await this.axios.head(this.databaseUrl + id);
 
         return result.status === 200;
     }
@@ -369,7 +389,7 @@ export class Client<T extends CouchDoc> {
      * Executes a view with the given designDocName and viewName. 
      */
     public async view<R>(designDocName: string, viewName: string, options: ViewOptions = {}): Promise<{ offset?: number, total_rows?: number, rows: R[] }> {
-        const result = await Axios.get(`${this.databaseUrl}_design/${designDocName}/_view/${viewName}`, {
+        const result = await this.axios.get(`${this.databaseUrl}_design/${designDocName}/_view/${viewName}`, {
             params: this.encodeOptions(options),
         });
         const body = await this.checkErrorAndGetBody(result);
@@ -511,7 +531,17 @@ export interface ClientOptions {
     /**
      * Whether the Davenport client should log warnings.
      */
-    warnings: boolean;
+    warnings?: boolean;
+
+    /**
+     * Username used to make requests with basic auth.
+     */
+    username?: string;
+
+    /**
+     * Password used to make requests with basic auth. 
+     */
+    password?: string;
 }
 
 export interface PropSelector {

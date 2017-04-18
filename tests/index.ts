@@ -1,9 +1,13 @@
 import inspect from "logspect";
 import { Expect, AsyncTest, Timeout, TestFixture } from "alsatian";
-import Client, { configureDatabase, CouchDoc, DesignDocConfiguration, PropSelector } from "../";
+import Client, { ClientOptions, configureDatabase, CouchDoc, DesignDocConfiguration, PropSelector } from "../";
 
 const DB_URL = "http://localhost:5984";
 const DB_NAME = "davenport_tests";
+const OPTIONS: ClientOptions = {
+    username: "test_admin",
+    password: "test_password"
+}
 
 declare const emit: (key: string, value) => void;
 
@@ -15,6 +19,10 @@ interface TestObject extends CouchDoc {
 
 function isClient(client): client is Client<any> {
     return client instanceof (Client);
+}
+
+function getClient(): Client<TestObject> {
+    return new Client<TestObject>(DB_URL, DB_NAME, OPTIONS);
 }
 
 const designDoc: DesignDocConfiguration = {
@@ -38,7 +46,7 @@ export class DavenportTestFixture {
         const db = await configureDatabase<TestObject>(DB_URL, {
             name: DB_NAME,
             designDocs: [designDoc]
-        })
+        }, OPTIONS)
 
         Expect(isClient(db)).toBe(true);
     }
@@ -46,7 +54,7 @@ export class DavenportTestFixture {
     @AsyncTest("Davenport new Client()")
     @Timeout(5000)
     public async createClientTest() {
-        const client = new Client<TestObject>(DB_URL, DB_NAME);
+        const client = getClient();
 
         Expect(isClient(client)).toBe(true);
     }
@@ -54,7 +62,7 @@ export class DavenportTestFixture {
     @AsyncTest("Davenport.post")
     @Timeout(5000)
     public async postTest() {
-        const client = new Client<TestObject>(DB_URL, DB_NAME);
+        const client = getClient();
         const result = await client.post({
             bar: 5,
             foo: 4,
@@ -68,7 +76,7 @@ export class DavenportTestFixture {
     @AsyncTest("Davenport.get")
     @Timeout(5000)
     public async getTest() {
-        const client = new Client<TestObject>(DB_URL, DB_NAME);
+        const client = getClient();
         const createResult = await client.post({
             bar: 5,
             foo: 4,
@@ -84,7 +92,7 @@ export class DavenportTestFixture {
     @AsyncTest("Davenport.put")
     @Timeout(5000)
     public async putTest() {
-        const client = new Client<TestObject>(DB_URL, DB_NAME);
+        const client = getClient();
         const createResult = await client.post({
             bar: 5,
             foo: 4,
@@ -106,7 +114,7 @@ export class DavenportTestFixture {
     @AsyncTest("Davenport.listWithDocs")
     @Timeout(5000)
     public async listWithDocsTest() {
-        const client = new Client<TestObject>(DB_URL, DB_NAME);
+        const client = getClient();
         const list = await client.listWithDocs();
 
         Expect(list.offset).toBe(0);
@@ -129,7 +137,7 @@ export class DavenportTestFixture {
     @AsyncTest("Davenport.listWithoutDocs")
     @Timeout(5000)
     public async listWithoutDocsTest() {
-        const client = new Client<TestObject>(DB_URL, DB_NAME);
+        const client = getClient();
         const list = await client.listWithoutDocs();
 
         Expect(list.offset).toBe(0);
@@ -141,7 +149,7 @@ export class DavenportTestFixture {
     @AsyncTest("Davenport.count")
     @Timeout(5000)
     public async countTest() {
-        const client = new Client<TestObject>(DB_URL, DB_NAME);
+        const client = getClient();
         const count = await client.count();
 
         Expect(count).toBeGreaterThan(0);
@@ -150,7 +158,7 @@ export class DavenportTestFixture {
     @AsyncTest("Davenport.count with selector")
     @Timeout(5000)
     public async countWithSelectorTest() {
-        const client = new Client<TestObject>(DB_URL, DB_NAME);
+        const client = getClient();
         const uuid = `a-unique-string-${Date.now()}`;
 
         for (let i = 0; i < 3; i++) {
@@ -171,7 +179,7 @@ export class DavenportTestFixture {
     @AsyncTest("Davenport.count with selector indexes")
     @Timeout(5000)
     public async countWithSelectorIndexesTest() {
-        const client = new Client<TestObject>(DB_URL, DB_NAME);
+        const client = getClient();
         const uuid = `a-unique-string-${Date.now()}`;
 
         for (let i = 0; i < 3; i++) {
@@ -194,7 +202,7 @@ export class DavenportTestFixture {
     @AsyncTest("Davenport.delete")
     @Timeout(5000)
     public async deleteTest() {
-        const client = new Client<TestObject>(DB_URL, DB_NAME);
+        const client = getClient();
         const createResult = await client.post({
             bar: 5,
             foo: 4,
@@ -214,7 +222,7 @@ export class DavenportTestFixture {
     @AsyncTest("Davenport.exists")
     @Timeout(5000)
     public async existsTest() {
-        const client = new Client<TestObject>(DB_URL, DB_NAME);
+        const client = getClient();
         const createResult = await client.post({
             bar: 5,
             foo: 4,
@@ -228,7 +236,7 @@ export class DavenportTestFixture {
     @AsyncTest("Davenport.exists with field value")
     @Timeout(5000)
     public async existsWithFieldValueTest() {
-        const client = new Client<TestObject>(DB_URL, DB_NAME);
+        const client = getClient();
         const uuid = `a-unique-string-${Date.now()}`;
         const createResult = await client.post({
             bar: 5,
@@ -243,7 +251,7 @@ export class DavenportTestFixture {
     @AsyncTest("Davenport.exists with selector")
     @Timeout(5000)
     public async existsWithSelectorTest() {
-        const client = new Client<TestObject>(DB_URL, DB_NAME);
+        const client = getClient();
         const uuid = `a-unique-string-${Date.now()}`;
         const createResult = await client.post({
             bar: 5,
@@ -262,7 +270,7 @@ export class DavenportTestFixture {
     @AsyncTest("Davenport.copy")
     @Timeout(5000)
     public async copyTest() {
-        const client = new Client<TestObject>(DB_URL, DB_NAME);
+        const client = getClient();
         const uuid = `a-unique-string-${Date.now()}`;
         const createResult = await client.post({
             bar: 5,
@@ -278,7 +286,7 @@ export class DavenportTestFixture {
     @AsyncTest("Davenport.find")
     @Timeout(5000)
     public async findTest() {
-        const client = new Client<TestObject>(DB_URL, DB_NAME);
+        const client = getClient();
 
         for (let i = 0; i < 3; i++) {
             await client.post({
@@ -301,7 +309,7 @@ export class DavenportTestFixture {
     @AsyncTest("Davenport.view")
     @Timeout(5000)
     public async viewTest() {
-        const client = new Client<TestObject>(DB_URL, DB_NAME);
+        const client = getClient();
         const result = await client.view(designDoc.name, designDoc.views[0].name);
 
         Expect(Array.isArray(result.rows)).toBe(true);
