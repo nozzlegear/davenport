@@ -393,7 +393,7 @@ export class Client<T extends CouchDoc> {
     /**
      * Executes a view with the given designDocName and viewName. Will not reduce by default, pass in the { reduce: true } option to reduce.
      */
-    public async view<DocType>(designDocName: string, viewName: string, options: ViewOptions = { reduce: false }): Promise<ViewResult<ViewRow<DocType>>> {
+    public async view<DocType>(designDocName: string, viewName: string, options: ViewOptions = { reduce: false }): Promise<ViewResult<DocType>> {
         const result = await this.axios.get(`${this.databaseUrl}_design/${designDocName}/_view/${viewName}`, {
             params: this.encodeOptions(options),
         });
@@ -472,10 +472,10 @@ export interface ViewOptions extends ListOptions {
     group_level?: number;
 }
 
-export interface ViewResult<RowType> {
+export interface ViewResult<DocType> {
     offset?: number; 
     total_rows?: number; 
-    rows: RowType[];
+    rows: ViewRow<DocType>[];
 }
 
 export interface ViewRow<DocType> {
