@@ -1,5 +1,10 @@
-import inspect from "logspect";
-import AxiosLib, { AxiosResponse, AxiosBasicCredentials, AxiosRequestConfig, AxiosInstance } from "axios";
+import AxiosLib, {
+    AxiosBasicCredentials,
+    AxiosInstance,
+    AxiosRequestConfig,
+    AxiosResponse
+    } from 'axios';
+import inspect from 'logspect';
 
 declare const emit: (key: string, value) => void;
 
@@ -398,17 +403,26 @@ export class Client<T extends CouchDoc> {
     }
 
     private encodeOptions(options: ListOptions) : object {
-        let requestOptions = {};
+        let keys = Object.getOwnPropertyNames(options || {}) as (keyof ListOptions)[];
 
-        for (var key in options) {
-            if (key == "keys" || key == "key" || key == "startkey" || key == "endkey") {
-                requestOptions[key] = JSON.stringify(options[key]);
-            } else {
-                requestOptions[key] = options[key];
+        return keys.reduce((requestOptions, key) => {
+            switch (key) {
+                case "keys":
+                case "key":
+                case "start_key":
+                case "end_key":
+                    requestOptions[key] = JSON.stringify(options[key]);
+                
+                    break;
+
+                default:
+                    requestOptions[key] = options[key];
+
+                    break;
             }
-        }
-        
-        return requestOptions;
+
+            return requestOptions;
+        }, {});
     }
 }
 
