@@ -1,15 +1,27 @@
-import inspect from "logspect";
-import { Expect, AsyncTest, Timeout, TestFixture } from "alsatian";
-import Client, { ClientOptions, configureDatabase, CouchDoc, DesignDocConfiguration, PropSelector } from "../";
+import Client, {
+    ClientOptions,
+    configureDatabase,
+    CouchDoc,
+    DesignDocConfiguration,
+    PropSelector,
+    ViewRow
+    } from '../';
+import inspect from 'logspect';
+import {
+    AsyncTest,
+    Expect,
+    TestFixture,
+    Timeout
+    } from 'alsatian';
 
 const DB_URL = "http://localhost:5984";
 const DB_NAME = "davenport_tests";
 const OPTIONS: ClientOptions = {
-    username: "test_admin",
-    password: "test_password"
+    // username: "test_admin",
+    // password: "test_password"
 }
 
-declare const emit: (key: string, value) => void;
+declare const emit: (key, value) => void;
 
 interface TestObject extends CouchDoc {
     hello: string;
@@ -27,15 +39,23 @@ function getClient(): Client<TestObject> {
 
 const designDoc: DesignDocConfiguration = {
     name: "list",
-    views: [{
-        name: "only-foos-greater-than-10",
-        map: function (doc: TestObject) {
-            if (doc.foo > 10) {
-                emit(doc._id, doc);
-            }
-        }.toString(),
-        reduce: "_count"
-    }]
+    views: [
+        {
+            name: "only-foos-greater-than-10",
+            map: function (doc: TestObject) {
+                if (doc.foo > 10) {
+                    emit(doc._id, doc);
+                }
+            }.toString(),
+            reduce: "_count"
+        },
+        {
+            name: "by-foo-value",
+            map: function (doc: TestObject) {
+                emit(doc.foo, doc);
+            }.toString(),
+        }
+    ]
 }
 
 @TestFixture("Davenport")
@@ -309,9 +329,120 @@ export class DavenportTestFixture {
     @AsyncTest("Davenport.view")
     @Timeout(5000)
     public async viewTest() {
+        await this.createFoosGreaterThan10();
+
         const client = getClient();
-        const result = await client.view(designDoc.name, designDoc.views[0].name);
+        const result = await client.view<TestObject>(designDoc.name, "only-foos-greater-than-10");
+
+        const testRows = () => {
+            this.checkViewRows(result.rows);
+        }
 
         Expect(Array.isArray(result.rows)).toBe(true);
+        Expect(result.rows.length > 0);
+        Expect(testRows).not.toThrow();
+        Expect(this.checkViewRows(result.rows)).toBe(true);
+    }
+
+    @AsyncTest("Davenport.view reduces result")
+    @Timeout(5000)
+    public async viewReducesTests() {
+        const client = getClient();
+        const result = await client.view<number>(designDoc.name, "only-foos-greater-than-10", {
+            reduce: true,
+            group: false
+        });
+
+        const sum = result.rows.reduce((sum, row) => sum + row.value, 0);
+        
+        Expect(Array.isArray(result.rows)).toBe(true);
+        Expect(sum).toBeGreaterThan(0);
+    }
+
+    @AsyncTest("Davenport.view with start and end keys")
+    @Timeout(5000)
+    public async viewWithKeysTest() {
+        await this.createFoosGreaterThan10();
+        
+        const client = getClient();
+        const result = await client.view<TestObject>(designDoc.name, "by-foo-value", {
+            start_key: 15,
+            end_key: 20
+        });
+
+        const testRows = () => {
+            this.checkViewRows(result.rows);
+        }
+
+        Expect(true).toBe(true);
+        Expect(result.rows.length > 0).toBe(true);
+        Expect(testRows).not.toThrow();
+        Expect(this.checkViewRows(result.rows)).toBe(true);
+        Expect(result.rows.every(row => row.value.foo >= 15 && row.value.foo <= 20));
+    }
+
+    private async createFoosGreaterThan10() {
+        const client = getClient();
+
+        await Promise.all([0,1,2,3,4,5].map(i => client.post({
+            bar: 5,
+            foo: i === 0 ? 17 : Math.floor(Math.random() * 30),
+            hello: "world"
+        })));
+    }
+
+    private checkViewRows(rows: ViewRow<TestObject>[]) {
+        const errors = rows.reduce((errors, row) => {
+            function pushError(prop: string, expectedType: string) {
+                errors.push({
+                    property: prop,
+                    message: `Property ${prop} was not of type ${expectedType}.`
+                })
+            };
+
+            if (typeof(row.id) !== "string") {
+                pushError("row.id", "string");  
+            }
+
+            if (! row.key) {
+                errors.push({property: "row.key", message: "row.key was not found."})
+            }
+
+            if (! row.value) {
+                errors.push({property: "row.value", message: "row.value was not found."})
+
+                return errors;
+            }
+
+            if (typeof(row.value.bar) !== "number") {
+                pushError("row.value.bar", "number");
+            }
+
+            if (typeof(row.value.foo) !== "number") {
+                pushError("row.value.foo", "number");
+            }
+
+            if (typeof(row.value.hello) !== "string") {
+                pushError("row.value.hello", "string");
+            }
+
+            if (typeof(row.value._id) !== "string") {
+                pushError("row.value._id", "string");
+            }
+
+            if (typeof(row.value._rev) !== "string") {
+                pushError("row.value._rev", "string");
+            }
+
+            return errors;
+        }, [] as {property: string; message: string;}[]);
+
+        if (errors.length > 0) {
+            inspect("View row errors: ", errors);
+
+            throw new Error(`There were ${errors.length} errors in the view result.`);
+        }
+
+        return errors.length === 0;
     }
 }

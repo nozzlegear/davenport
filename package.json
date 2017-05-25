@@ -7,7 +7,8 @@
   "scripts": {
     "build": "rimraf ./bin && tsc -p . && npm run webpack",
     "webpack": "webpack bin/index.js bin/browser.js --output-library Davenport",
-    "test": "npm run build && alsatian -T ./bin/tests/index.js | tap-bark",
+    "pretest": "npm run build",
+    "test": "alsatian -T ./bin/tests/index.js",
     "prepublish": "npm run build"
   },
   "repository": {
@@ -39,7 +40,7 @@
     "alsatian": "^1.0.1",
     "rimraf": "^2.5.4",
     "tap-bark": "^1.0.0",
-    "typescript": "^2.2.1",
+    "typescript": "^2.3.3",
     "webpack": "^2.2.1"
   }
 }

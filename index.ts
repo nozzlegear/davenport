@@ -391,9 +391,9 @@ export class Client<T extends CouchDoc> {
     }
 
     /**
-     * Executes a view with the given designDocName and viewName. 
+     * Executes a view with the given designDocName and viewName. Will not reduce by default, pass in the { reduce: true } option to reduce.
      */
-    public async view<R>(designDocName: string, viewName: string, options: ViewOptions = {}): Promise<{ offset?: number, total_rows?: number, rows: R[] }> {
+    public async view<DocType>(designDocName: string, viewName: string, options: ViewOptions = { reduce: false }): Promise<ViewResult<ViewRow<DocType>>> {
         const result = await this.axios.get(`${this.databaseUrl}_design/${designDocName}/_view/${viewName}`, {
             params: this.encodeOptions(options),
         });
@@ -470,6 +470,18 @@ export interface ViewOptions extends ListOptions {
     reduce?: boolean;
     group?: boolean;
     group_level?: number;
+}
+
+export interface ViewResult<RowType> {
+    offset?: number; 
+    total_rows?: number; 
+    rows: RowType[];
+}
+
+export interface ViewRow<DocType> {
+    id?: string;
+    key?: any;
+    value: DocType;
 }
 
 /**
