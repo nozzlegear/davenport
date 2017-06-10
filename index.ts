@@ -402,6 +402,22 @@ export class Client<T extends CouchDoc> {
         return body;
     }
 
+    /**
+     * Creates the database associated with this client
+     */
+    public async createDb(url: string = this.databaseUrl): Promise<BasicCouchResponse> {
+        const result = await this.axios.put(url);
+        return await this.checkErrorAndGetBody(result);
+    }
+
+    /**
+     * Deletes the database associated with this client
+     */
+    public async deleteDb(url: string = this.databaseUrl): Promise<BasicCouchResponse> {
+        const result = await this.axios.delete(url);
+        return await this.checkErrorAndGetBody(result);
+    }
+
     private encodeOptions(options: ListOptions) : object {
         let keys = Object.getOwnPropertyNames(options || {}) as (keyof ListOptions)[];
 
@@ -412,7 +428,7 @@ export class Client<T extends CouchDoc> {
                 case "start_key":
                 case "end_key":
                     requestOptions[key] = JSON.stringify(options[key]);
-                
+
                     break;
 
                 default:
@@ -511,8 +527,11 @@ export interface AllDocsListResult<T> {
     total_rows: number
 }
 
-interface CouchResponse {
+export interface BasicCouchResponse {
     ok: boolean;
+}
+
+interface CouchResponse extends BasicCouchResponse {
     id: string;
     rev: string;
 }
@@ -580,7 +599,7 @@ export interface PropSelector {
      * Property is not equal to this value.
      */
     $ne?: any;
-    
+
     /**
      * Property is greater than this value.
      */

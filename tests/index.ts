@@ -1,4 +1,5 @@
 import Client, {
+    BasicCouchResponse,
     ClientOptions,
     configureDatabase,
     CouchDoc,
@@ -8,6 +9,7 @@ import Client, {
     } from '../';
 import inspect from 'logspect';
 import {
+    AsyncTeardownFixture,
     AsyncTest,
     Expect,
     TestFixture,
@@ -60,6 +62,26 @@ const designDoc: DesignDocConfiguration = {
 
 @TestFixture("Davenport")
 export class DavenportTestFixture {
+    @AsyncTest("Davenport.createDeleteDb")
+    @Timeout(5000)
+    public async createDeleteDbTest() {
+        const client = new Client(DB_URL, "davenport_delete_me", OPTIONS);
+
+        let result = await client.createDb();
+        Expect(result.ok).toBe(true);
+
+        result = await client.deleteDb();
+        Expect(result.ok).toBe(true);
+    }
+
+    @AsyncTeardownFixture
+    @Timeout(5000)
+    public async teardownFixture() {
+        const client = getClient();
+        const result = await client.deleteDb();
+        Expect(result.ok).toBe(true);
+    }
+
     @AsyncTest("Davenport.configureDatabase")
     @Timeout(5000)
     public async configureTest() {
@@ -354,7 +376,7 @@ export class DavenportTestFixture {
         });
 
         const sum = result.rows.reduce((sum, row) => sum + row.value, 0);
-        
+
         Expect(Array.isArray(result.rows)).toBe(true);
         Expect(sum).toBeGreaterThan(0);
     }
@@ -363,7 +385,7 @@ export class DavenportTestFixture {
     @Timeout(5000)
     public async viewWithKeysTest() {
         await this.createFoosGreaterThan10();
-        
+
         const client = getClient();
         const result = await client.view<TestObject>(designDoc.name, "by-foo-value", {
             start_key: 15,
@@ -401,7 +423,7 @@ export class DavenportTestFixture {
             };
 
             if (typeof(row.id) !== "string") {
-                pushError("row.id", "string");  
+                pushError("row.id", "string");
             }
 
             if (! row.key) {
