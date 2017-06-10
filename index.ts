@@ -403,18 +403,20 @@ export class Client<T extends CouchDoc> {
     }
 
     /**
-     * Creates the database associated with this client
+     * Creates the database associated with this client.
      */
     public async createDb(url: string = this.databaseUrl): Promise<BasicCouchResponse> {
         const result = await this.axios.put(url);
+        
         return await this.checkErrorAndGetBody(result);
     }
 
     /**
-     * Deletes the database associated with this client
+     * Deletes the database associated with this client.
      */
     public async deleteDb(url: string = this.databaseUrl): Promise<BasicCouchResponse> {
         const result = await this.axios.delete(url);
+
         return await this.checkErrorAndGetBody(result);
     }
 
