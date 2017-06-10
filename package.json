@@ -11,7 +11,7 @@
     "pretest:raw": "npm run build",
     "test": "alsatian -T ./bin/tests/index.js | tap-bark",
     "test:raw": "alsatian -T ./bin/tests/index.js",
-    "prepublish": "npm run build"
+    "prepublishOnly": "npm run build"
   },
   "repository": {
     "type": "git",
