@@ -4,6 +4,10 @@
   "description": "A CouchDB client for simplifying common tasks like get, list, create, update and delete. Comes complete with full TypeScript definitions.",
   "main": "bin/index.js",
   "typings": "bin/index.d.ts",
+  "files": [
+    "bin/index.*",
+    "bin/browser.js"
+  ],
   "scripts": {
     "build": "rimraf ./bin && tsc -p . && npm run webpack",
     "webpack": "webpack bin/index.js bin/browser.js --output-library Davenport",
