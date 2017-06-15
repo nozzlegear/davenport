@@ -4,6 +4,7 @@ import Client, {
     configureDatabase,
     CouchDoc,
     DesignDocConfiguration,
+    isDavenportError,
     PropSelector,
     ViewRow
     } from '../';
@@ -65,13 +66,27 @@ export class DavenportTestFixture {
     @AsyncTest("Davenport.createDeleteDb")
     @Timeout(5000)
     public async createDeleteDbTest() {
-        const client = new Client(DB_URL, "davenport_delete_me", OPTIONS);
+        const dbName = "davenport_delete_me";
+        const client = new Client(DB_URL, dbName, OPTIONS);
 
         let result = await client.createDb();
         Expect(result.ok).toBe(true);
 
+        const dbInfo = await client.getDbInfo();
+        Expect(dbInfo.db_name).toEqual(dbName);
+
         result = await client.deleteDb();
         Expect(result.ok).toBe(true);
+
+        try {
+            await client.getDbInfo();
+        } catch (err) {
+            if (isDavenportError(err)) {
+                Expect(err.status).toEqual(404);
+            } else {
+                throw err;
+            }
+        }
     }
 
     @AsyncTeardownFixture

@@ -420,6 +420,15 @@ export class Client<T extends CouchDoc> {
         return await this.checkErrorAndGetBody(result);
     }
 
+    /**
+     * Returns database info for the given database.
+     */
+    public async getDbInfo(url: string = this.databaseUrl): Promise<DbInfo> {
+      const result = await this.axios.get(url);
+
+      return await this.checkErrorAndGetBody(result);
+    }
+  
     private encodeOptions(options: ListOptions) : object {
         let keys = Object.getOwnPropertyNames(options || {}) as (keyof ListOptions)[];
 
@@ -527,6 +536,31 @@ export interface AllDocsListResult<T> {
     }[],
     offset: number,
     total_rows: number
+}
+
+export interface DbSizes {
+  file: number;
+  external: number;
+  active: number
+};
+
+export interface DbOther {
+  data_size?: number;
+}
+
+export interface DbInfo {
+  db_name: string;
+  update_seq: string;
+  sizes: DbSizes;
+  purge_seq: number;
+  other?: DbOther;
+  doc_del_count: number;
+  doc_count: number;
+  disk_size: number;
+  disk_format_version: number;
+  data_size: number;
+  compact_running: boolean;
+  instance_start_time: number;
 }
 
 export interface BasicCouchResponse {
