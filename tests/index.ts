@@ -6,7 +6,8 @@ import Client, {
     DesignDocConfiguration,
     isDavenportError,
     PropSelector,
-    ViewRow
+    ViewRow,
+    ViewRowWithDoc
     } from '../';
 import inspect from 'logspect';
 import {
@@ -387,6 +388,24 @@ export class DavenportTestFixture {
         Expect(this.checkViewRows(result.rows)).toBe(true);
     }
 
+    @AsyncTest("Davenport.viewWithDocs")
+    @Timeout(5000)
+    public async viewWithDocsTest() {
+        await this.createFoosGreaterThan10();
+
+        const client = getClient();
+        const result = await client.viewWithDocs<TestObject>(designDoc.name, "only-foos-greater-than-10");
+
+        const testRows = () => {
+            this.checkViewRows(result.rows);
+        }
+
+        Expect(Array.isArray(result.rows)).toBe(true);
+        Expect(result.rows.length > 0);
+        Expect(testRows).not.toThrow();
+        Expect(this.checkViewRows(result.rows)).toBe(true);
+    }
+
     @AsyncTest("Davenport.view reduces result")
     @Timeout(5000)
     public async viewReducesTests() {
@@ -466,6 +485,10 @@ export class DavenportTestFixture {
         })));
     }
 
+    private hasDoc(arg: ViewRow<TestObject>): arg is ViewRowWithDoc<TestObject> {
+      return (arg as ViewRowWithDoc<TestObject>).doc !== undefined;
+    }
+    
     private checkViewRows(rows: ViewRow<TestObject>[]) {
         const errors = rows.reduce((errors, row) => {
             function pushError(prop: string, expectedType: string) {
@@ -474,6 +497,12 @@ export class DavenportTestFixture {
                     message: `Property ${prop} was not of type ${expectedType}.`
                 })
             };
+
+            if (this.hasDoc(row)) {
+              if (! row.doc) {
+                errors.push({property: "row.doc", message: "row.doc was not found."});
+              }
+            }
 
             if (typeof(row.id) !== "string") {
                 pushError("row.id", "string");
