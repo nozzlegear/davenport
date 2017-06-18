@@ -511,15 +511,17 @@ export interface ViewRow<DocType> {
     value: DocType;
 }
 
+export type Key = string | number | Object;
+
 /**
  * Options for listing database results.
  */
 export interface ListOptions {
     limit?: number;
-    key?: string;
-    keys?: string[];
-    start_key?: string | number;
-    end_key?: string | number;
+    key?: Key;
+    keys?: Key[];
+    start_key?: Key | Key[];
+    end_key?: Key | Key[];
     inclusive_end?: boolean;
     descending?: boolean;
     skip?: number;

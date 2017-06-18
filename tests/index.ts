@@ -57,6 +57,12 @@ const designDoc: DesignDocConfiguration = {
             map: function (doc: TestObject) {
                 emit(doc.foo, doc);
             }.toString(),
+        },
+        {
+            name: "by-foo-complex-key",
+            map: function (doc: TestObject) {
+                emit([doc.hello, doc.foo], doc);
+            }.toString(),
         }
     ]
 }
@@ -415,16 +421,48 @@ export class DavenportTestFixture {
         Expect(result.rows.length > 0).toBe(true);
         Expect(testRows).not.toThrow();
         Expect(this.checkViewRows(result.rows)).toBe(true);
-        Expect(result.rows.every(row => row.value.foo >= 15 && row.value.foo <= 20));
+        Expect(result.rows.every(row => row.value.foo >= 15 && row.value.foo <= 20)).toBe(true);
     }
 
-    private async createFoosGreaterThan10() {
+    @AsyncTest("Davenport.view with complex start and end keys")
+    @Timeout(5000)
+    public async viewWithComplexKeyTest() {
+        const keyPart = "keyPart";
+        await this.createFoosGreaterThan10(keyPart);
+        const client = getClient();
+        let result = await client.view<TestObject>(designDoc.name, "by-foo-complex-key", {
+            start_key: [keyPart],
+            end_key: [keyPart, {}],
+            inclusive_end: true
+        });
+
+        const testRows = () => {
+            this.checkViewRows(result.rows);
+        }
+
+        Expect(result.rows.length).toEqual(6);
+        Expect(testRows).not.toThrow();
+        Expect(this.checkViewRows(result.rows)).toBe(true);
+
+        result = await client.view<TestObject>(designDoc.name, "by-foo-complex-key", {
+            start_key: [keyPart, 15],
+            end_key: [keyPart, 20],
+            inclusive_end: true
+        });
+
+        Expect(testRows).not.toThrow();
+        Expect(this.checkViewRows(result.rows)).toBe(true);
+        Expect(result.rows.every(row => (row.key[1] >= 15 && row.key[1] <= 20))).toBe(true);
+        Expect(result.rows.every(row => row.value.foo >= 15 && row.value.foo <= 20)).toBe(true);
+    }
+
+    private async createFoosGreaterThan10(hello: string = "world") {
         const client = getClient();
 
         await Promise.all([0,1,2,3,4,5].map(i => client.post({
             bar: 5,
             foo: i === 0 ? 17 : Math.floor(Math.random() * 30),
-            hello: "world"
+            hello: hello
         })));
     }
 
