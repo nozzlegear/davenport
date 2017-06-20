@@ -403,6 +403,18 @@ export class Client<T extends CouchDoc> {
     }
 
     /**
+     * Executes a view with the given designDocName and viewName. Will not reduce.
+     */
+    public async viewWithDocs<DocType>(designDocName: string, viewName: string, options: ViewOptions = { reduce: false }): Promise<ViewResultWithDocs<DocType>> {
+        const result = await this.axios.get(`${this.databaseUrl}_design/${designDocName}/_view/${viewName}`, {
+            params: { ...this.encodeOptions(options), reduce: false, include_docs: true }
+        });
+        const body = await this.checkErrorAndGetBody(result);
+
+        return body;
+    }
+
+    /**
      * Creates the database associated with this client.
      */
     public async createDb(url: string = this.databaseUrl): Promise<BasicCouchResponse> {
@@ -511,15 +523,27 @@ export interface ViewRow<DocType> {
     value: DocType;
 }
 
+export interface ViewRowWithDoc<DocType> extends ViewRow<DocType> {
+    doc: DocType;
+}
+
+export interface ViewResultWithDocs<DocType> {
+    offset?: number; 
+    total_rows?: number; 
+    rows: ViewRowWithDoc<DocType>[];
+}
+
+export type Key = string | number | Object;
+
 /**
  * Options for listing database results.
  */
 export interface ListOptions {
     limit?: number;
-    key?: string;
-    keys?: string[];
-    start_key?: string | number;
-    end_key?: string | number;
+    key?: Key;
+    keys?: Key[];
+    start_key?: Key | Key[];
+    end_key?: Key | Key[];
     inclusive_end?: boolean;
     descending?: boolean;
     skip?: number;

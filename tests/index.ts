@@ -6,7 +6,8 @@ import Client, {
     DesignDocConfiguration,
     isDavenportError,
     PropSelector,
-    ViewRow
+    ViewRow,
+    ViewRowWithDoc
     } from '../';
 import inspect from 'logspect';
 import {
@@ -56,6 +57,12 @@ const designDoc: DesignDocConfiguration = {
             name: "by-foo-value",
             map: function (doc: TestObject) {
                 emit(doc.foo, doc);
+            }.toString(),
+        },
+        {
+            name: "by-foo-complex-key",
+            map: function (doc: TestObject) {
+                emit([doc.hello, doc.foo], doc);
             }.toString(),
         }
     ]
@@ -381,6 +388,24 @@ export class DavenportTestFixture {
         Expect(this.checkViewRows(result.rows)).toBe(true);
     }
 
+    @AsyncTest("Davenport.viewWithDocs")
+    @Timeout(5000)
+    public async viewWithDocsTest() {
+        await this.createFoosGreaterThan10();
+
+        const client = getClient();
+        const result = await client.viewWithDocs<TestObject>(designDoc.name, "only-foos-greater-than-10");
+
+        const testRows = () => {
+            this.checkViewRows(result.rows);
+        }
+
+        Expect(Array.isArray(result.rows)).toBe(true);
+        Expect(result.rows.length > 0);
+        Expect(testRows).not.toThrow();
+        Expect(this.checkViewRows(result.rows)).toBe(true);
+    }
+
     @AsyncTest("Davenport.view reduces result")
     @Timeout(5000)
     public async viewReducesTests() {
@@ -415,19 +440,55 @@ export class DavenportTestFixture {
         Expect(result.rows.length > 0).toBe(true);
         Expect(testRows).not.toThrow();
         Expect(this.checkViewRows(result.rows)).toBe(true);
-        Expect(result.rows.every(row => row.value.foo >= 15 && row.value.foo <= 20));
+        Expect(result.rows.every(row => row.value.foo >= 15 && row.value.foo <= 20)).toBe(true);
     }
 
-    private async createFoosGreaterThan10() {
+    @AsyncTest("Davenport.view with complex start and end keys")
+    @Timeout(5000)
+    public async viewWithComplexKeyTest() {
+        const keyPart = "keyPart";
+        await this.createFoosGreaterThan10(keyPart);
+        const client = getClient();
+        let result = await client.view<TestObject>(designDoc.name, "by-foo-complex-key", {
+            start_key: [keyPart],
+            end_key: [keyPart, {}],
+            inclusive_end: true
+        });
+
+        const testRows = () => {
+            this.checkViewRows(result.rows);
+        }
+
+        Expect(result.rows.length).toEqual(6);
+        Expect(testRows).not.toThrow();
+        Expect(this.checkViewRows(result.rows)).toBe(true);
+
+        result = await client.view<TestObject>(designDoc.name, "by-foo-complex-key", {
+            start_key: [keyPart, 15],
+            end_key: [keyPart, 20],
+            inclusive_end: true
+        });
+
+        Expect(testRows).not.toThrow();
+        Expect(this.checkViewRows(result.rows)).toBe(true);
+        Expect(result.rows.every(row => (row.key[1] >= 15 && row.key[1] <= 20))).toBe(true);
+        Expect(result.rows.every(row => row.value.foo >= 15 && row.value.foo <= 20)).toBe(true);
+    }
+
+    private async createFoosGreaterThan10(hello: string = "world") {
         const client = getClient();
 
         await Promise.all([0,1,2,3,4,5].map(i => client.post({
             bar: 5,
             foo: i === 0 ? 17 : Math.floor(Math.random() * 30),
-            hello: "world"
+            hello: hello
         })));
     }
 
+    private hasDoc(arg: ViewRow<TestObject>): arg is ViewRowWithDoc<TestObject> {
+      return (arg as ViewRowWithDoc<TestObject>).doc !== undefined;
+    }
+    
     private checkViewRows(rows: ViewRow<TestObject>[]) {
         const errors = rows.reduce((errors, row) => {
             function pushError(prop: string, expectedType: string) {
@@ -436,6 +497,12 @@ export class DavenportTestFixture {
                     message: `Property ${prop} was not of type ${expectedType}.`
                 })
             };
+
+            if (this.hasDoc(row)) {
+              if (! row.doc) {
+                errors.push({property: "row.doc", message: "row.doc was not found."});
+              }
+            }
 
             if (typeof(row.id) !== "string") {
                 pushError("row.id", "string");
