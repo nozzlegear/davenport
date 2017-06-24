@@ -49,7 +49,7 @@ function getAxiosInstance(options: ClientOptions): AxiosInstance {
         // Like fetch, Axios should never throw an error if it receives a response
         validateStatus: (status) => true,
         auth: auth,
-        proxy: options.proxy
+        proxy: options && options.proxy
     });
 
     return instance;
