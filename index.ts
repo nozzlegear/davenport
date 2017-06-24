@@ -34,7 +34,7 @@ export const GENERIC_LIST_VIEW = {
 /**
  * Configures an instance of Axios with auth and validation defaults.
  */
-function getAxiosInstance (options: ClientOptions): AxiosInstance {
+function getAxiosInstance(options: ClientOptions): AxiosInstance {
     let auth: AxiosBasicCredentials;
 
     if (options && (options.username || options.password)) {
@@ -301,7 +301,7 @@ export class Client<T extends CouchDoc> {
      * Updates or creates a document with the given id. By CouchDB convention, this will only return the id and revision id of the new document, not the document itself.
      */
     public async put(id: string, data: T, rev: string): Promise<PostPutCopyResponse> {
-        if (!rev && !! this.getOption("warnings")) {
+        if (!rev && !!this.getOption("warnings")) {
             inspect(`Davenport warning: no revision specified for Davenport.put function with id ${id}. This may cause a document conflict error.`);
         }
 
@@ -394,6 +394,11 @@ export class Client<T extends CouchDoc> {
      * Executes a view with the given designDocName and viewName. Will not reduce by default, pass in the { reduce: true } option to reduce.
      */
     public async view<DocType>(designDocName: string, viewName: string, options: ViewOptions = { reduce: false }): Promise<ViewResult<DocType>> {
+        // Ensure reduce is set to false unless explicitly set by the caller.
+        if (typeof (options.reduce) !== "boolean") {
+            options.reduce = false;
+        }
+
         const result = await this.axios.get(`${this.databaseUrl}_design/${designDocName}/_view/${viewName}`, {
             params: this.encodeOptions(options),
         });
@@ -403,7 +408,7 @@ export class Client<T extends CouchDoc> {
     }
 
     /**
-     * Executes a view with the given designDocName and viewName. Will not reduce.
+     * Executes a view with the given designDocName and viewName. This method will never reduce the result.
      */
     public async viewWithDocs<DocType>(designDocName: string, viewName: string, options: ViewOptions = { reduce: false }): Promise<ViewResultWithDocs<DocType>> {
         const result = await this.axios.get(`${this.databaseUrl}_design/${designDocName}/_view/${viewName}`, {
@@ -419,7 +424,7 @@ export class Client<T extends CouchDoc> {
      */
     public async createDb(url: string = this.databaseUrl): Promise<BasicCouchResponse> {
         const result = await this.axios.put(url);
-        
+
         return await this.checkErrorAndGetBody(result);
     }
 
@@ -436,12 +441,12 @@ export class Client<T extends CouchDoc> {
      * Returns database info for the given database.
      */
     public async getDbInfo(url: string = this.databaseUrl): Promise<DbInfo> {
-      const result = await this.axios.get(url);
+        const result = await this.axios.get(url);
 
-      return await this.checkErrorAndGetBody(result);
+        return await this.checkErrorAndGetBody(result);
     }
-  
-    private encodeOptions(options: ListOptions) : object {
+
+    private encodeOptions(options: ListOptions): object {
         let keys = Object.getOwnPropertyNames(options || {}) as (keyof ListOptions)[];
 
         return keys.reduce((requestOptions, key) => {
@@ -512,8 +517,8 @@ export interface ViewOptions extends ListOptions {
 }
 
 export interface ViewResult<DocType> {
-    offset?: number; 
-    total_rows?: number; 
+    offset?: number;
+    total_rows?: number;
     rows: ViewRow<DocType>[];
 }
 
@@ -528,8 +533,8 @@ export interface ViewRowWithDoc<DocType> extends ViewRow<DocType> {
 }
 
 export interface ViewResultWithDocs<DocType> {
-    offset?: number; 
-    total_rows?: number; 
+    offset?: number;
+    total_rows?: number;
     rows: ViewRowWithDoc<DocType>[];
 }
 
@@ -563,28 +568,28 @@ export interface AllDocsListResult<T> {
 }
 
 export interface DbSizes {
-  file: number;
-  external: number;
-  active: number
+    file: number;
+    external: number;
+    active: number
 };
 
 export interface DbOther {
-  data_size?: number;
+    data_size?: number;
 }
 
 export interface DbInfo {
-  db_name: string;
-  update_seq: string;
-  sizes: DbSizes;
-  purge_seq: number;
-  other?: DbOther;
-  doc_del_count: number;
-  doc_count: number;
-  disk_size: number;
-  disk_format_version: number;
-  data_size: number;
-  compact_running: boolean;
-  instance_start_time: number;
+    db_name: string;
+    update_seq: string;
+    sizes: DbSizes;
+    purge_seq: number;
+    other?: DbOther;
+    doc_del_count: number;
+    doc_count: number;
+    disk_size: number;
+    disk_format_version: number;
+    data_size: number;
+    compact_running: boolean;
+    instance_start_time: number;
 }
 
 export interface BasicCouchResponse {
