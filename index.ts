@@ -1,6 +1,7 @@
 import AxiosLib, {
     AxiosBasicCredentials,
     AxiosInstance,
+    AxiosProxyConfig,
     AxiosRequestConfig,
     AxiosResponse
     } from 'axios';
@@ -48,6 +49,7 @@ function getAxiosInstance(options: ClientOptions): AxiosInstance {
         // Like fetch, Axios should never throw an error if it receives a response
         validateStatus: (status) => true,
         auth: auth,
+        proxy: options.proxy
     });
 
     return instance;
@@ -688,6 +690,11 @@ export interface ClientOptions {
      * Password used to make requests with basic auth. 
      */
     password?: string;
+
+    /**
+     * Proxy configuration object.
+     */
+    proxy?: AxiosProxyConfig;
 }
 
 export interface PropSelector {
