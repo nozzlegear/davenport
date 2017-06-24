@@ -84,17 +84,9 @@ export class DavenportTestFixture {
     @Timeout(5000)
     public async setupFixture() {
         const client = getClient();
+        const result = await client.createDb();
 
-        try {
-            await client.createDb();
-        } catch (_e) {
-            const e: DavenportError = _e;
-
-            // 412 = Database already exists
-            if (e.status !== 412) {
-                throw e;
-            }
-        }
+        Expect(result.ok).toBe(true);
 
         // Insert at least one doc for list tests
         const insert = await client.post({
@@ -117,15 +109,15 @@ export class DavenportTestFixture {
     public async createDeleteDbTest() {
         const dbName = "davenport_delete_me";
         const client = new Client(DB_URL, dbName, OPTIONS);
+        const createResult = await client.createDb();
 
-        let result = await client.createDb();
-        Expect(result.ok).toBe(true);
+        Expect(createResult.ok).toBe(true);
 
         const dbInfo = await client.getDbInfo();
         Expect(dbInfo.db_name).toEqual(dbName);
 
-        result = await client.deleteDb();
-        Expect(result.ok).toBe(true);
+        const deleteResult = await client.deleteDb();
+        Expect(deleteResult.ok).toBe(true);
 
         try {
             await client.getDbInfo();
@@ -136,6 +128,21 @@ export class DavenportTestFixture {
                 throw err;
             }
         }
+    }
+
+    @AsyncTest("Davenport.createDb when database already exists")
+    @Timeout(5000)
+    public async createDbWhenItExistsTest() {
+        const dbName = "davenport_delete-me";
+        const client = new Client(DB_URL, dbName, OPTIONS);
+        const firstResult = await client.createDb();
+
+        Expect(firstResult.ok).toBe(true);
+
+        const secondResult = await client.createDb();
+
+        Expect(secondResult.ok).toBe(true);
+        Expect(secondResult.alreadyExisted).toBe(true);
     }
 
     @AsyncTest("Davenport.configureDatabase")

@@ -452,10 +452,22 @@ export class Client<T extends CouchDoc> {
     /**
      * Creates the database associated with this client.
      */
-    public async createDb(url: string = this.databaseUrl): Promise<BasicCouchResponse> {
+    public async createDb(url: string = this.databaseUrl): Promise<CreateDatabaseResponse> {
         const result = await this.axios.put(url);
 
-        return await this.checkErrorAndGetBody(result);
+        if (result.status === 412) {
+            return {
+                ok: true,
+                alreadyExisted: true
+            }
+        }
+
+        const body: BasicCouchResponse = await this.checkErrorAndGetBody(result);
+
+        return {
+            ...body,
+            alreadyExisted: false
+        }
     }
 
     /**
@@ -632,6 +644,13 @@ export interface DbInfo {
 
 export interface BasicCouchResponse {
     ok: boolean;
+}
+
+export interface CreateDatabaseResponse extends BasicCouchResponse {
+    /**
+     * Whether the database already existed when trying to create it. Determined by CouchDB returning a 412 Precondition Failed response.
+     */
+    alreadyExisted: boolean;
 }
 
 interface CouchResponse extends BasicCouchResponse {
