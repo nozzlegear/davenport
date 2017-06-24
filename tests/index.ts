@@ -1,28 +1,38 @@
 import Client, {
     BasicCouchResponse,
+    BulkDocumentError,
+    BulkResponse,
     ClientOptions,
     configureDatabase,
     CouchDoc,
     DesignDocConfiguration,
     isDavenportError,
+    PostPutCopyResponse,
     PropSelector,
     ViewRow,
     ViewRowWithDoc
     } from '../';
 import inspect from 'logspect';
 import {
+    AsyncSetupFixture,
     AsyncTeardownFixture,
     AsyncTest,
     Expect,
+    FocusTest,
     TestFixture,
     Timeout
     } from 'alsatian';
+import { DavenportError } from '../index';
 
 const DB_URL = "http://localhost:5984";
 const DB_NAME = "davenport_tests";
 const OPTIONS: ClientOptions = {
     // username: "test_admin",
     // password: "test_password"
+    // proxy: {
+    //     host: "127.0.0.1",
+    //     port: 8888
+    // }
 }
 
 declare const emit: (key, value) => void;
@@ -70,6 +80,38 @@ const designDoc: DesignDocConfiguration = {
 
 @TestFixture("Davenport")
 export class DavenportTestFixture {
+    @AsyncSetupFixture
+    @Timeout(5000)
+    public async setupFixture() {
+        const client = getClient();
+
+        try {
+            await client.createDb();
+        } catch (_e) {
+            const e: DavenportError = _e;
+
+            // 412 = Database already exists
+            if (e.status !== 412) {
+                throw e;
+            }
+        }
+
+        // Insert at least one doc for list tests
+        const insert = await client.post({
+            bar: 117,
+            foo: 22,
+            hello: "world"
+        })
+    }
+
+    @AsyncTeardownFixture
+    @Timeout(5000)
+    public async teardownFixture() {
+        const client = getClient();
+        const result = await client.deleteDb();
+        Expect(result.ok).toBe(true);
+    }
+
     @AsyncTest("Davenport.createDeleteDb")
     @Timeout(5000)
     public async createDeleteDbTest() {
@@ -94,14 +136,6 @@ export class DavenportTestFixture {
                 throw err;
             }
         }
-    }
-
-    @AsyncTeardownFixture
-    @Timeout(5000)
-    public async teardownFixture() {
-        const client = getClient();
-        const result = await client.deleteDb();
-        Expect(result.ok).toBe(true);
     }
 
     @AsyncTest("Davenport.configureDatabase")
@@ -207,7 +241,7 @@ export class DavenportTestFixture {
         Expect(list.offset).toBe(0);
         Expect(Array.isArray(list.rows)).toBe(true);
         Expect(list.total_rows).toBeGreaterThan(0);
-        Expect(list.rows.every(r => typeof(r.rev) === "string" && typeof(r["id"]) === "undefined" )).toBe(true);
+        Expect(list.rows.every(r => typeof (r.rev) === "string" && typeof (r["id"]) === "undefined")).toBe(true);
     }
 
     @AsyncTest("Davenport.count")
@@ -475,10 +509,85 @@ export class DavenportTestFixture {
         Expect(result.rows.every(row => row.value.foo >= 15 && row.value.foo <= 20)).toBe(true);
     }
 
+    @AsyncTest("Davenport.bulk insert with auto-generated ids.")
+    @Timeout(5000)
+    public async bulkTest() {
+        const docs = [...Array(100).keys()].map<TestObject>(i => ({
+            bar: i,
+            foo: i * 3,
+            hello: "world"
+        }))
+
+        const client = getClient();
+        const result = await client.bulk(docs);
+
+        Expect(result.length).toEqual(100);
+        Expect(result.every(item => !this.isBulkError(item))).toBe(true);
+        Expect(result.every((item: PostPutCopyResponse) => !!item.id && !!item.rev)).toBe(true);
+    }
+
+    @AsyncTest("Davenport.bulk insert with custom ids.")
+    @Timeout(5000)
+    public async bulkWithCustomIdsTest() {
+        const generatedIds: string[] = [];
+        const docs = [...Array(100).keys()].map<TestObject>(i => {
+            const id = this.guid();
+            generatedIds.push(id);
+
+            return {
+                _id: id,
+                bar: i,
+                foo: i * 4,
+                hello: "goodbye"
+            }
+        })
+        const client = getClient();
+        const result = await client.bulk(docs);
+
+        Expect(result.length).toEqual(100);
+        Expect(result.every(item => !this.isBulkError(item))).toBe(true);
+        Expect(result.every((item: PostPutCopyResponse) => generatedIds.indexOf(item.id) > -1 && !!item.rev)).toBe(true);
+    }
+
+    @AsyncTest("Davenport.bulk insert and update with conflicts")
+    @Timeout(5000)
+    public async bulkWithConflicts() {
+        const client = getClient();
+        const totalExisting = 10;
+        const totalOperations = 100;
+        const existingDocs = await client.bulk([...Array(totalExisting).keys()].map<TestObject>(i => ({
+            bar: i,
+            foo: i * 5,
+            hello: "I'm an existing doc, used with the bulkWithConflicts test."
+        })));
+        const result = await client.bulk([...Array(totalOperations).keys()].map<TestObject>(i => {
+            const existingDoc = existingDocs[i];
+            const id = existingDoc ? existingDoc.id : undefined;
+
+            return {
+                _id: id,
+                bar: i,
+                foo: i * 5,
+                hello: "I'm a generated doc, used with the bulkWIthConflicts test."
+            }
+        }))
+
+        Expect(result.length).toEqual(100);
+        Expect(result.every(item => !!item.id)).toBe(true);
+
+        const conflicts = result.filter(this.isBulkError);
+        const rest = result.filter(item => !this.isBulkError(item));
+
+        Expect(conflicts.length).toEqual(totalExisting);
+        Expect(conflicts.every((item: BulkDocumentError) => item.error === "conflict" && !!item.reason)).toBe(true);
+        Expect(rest.length).toEqual(totalOperations - totalExisting);
+        Expect(rest.every((item: PostPutCopyResponse) => !!item.rev)).toBe(true);
+    }
+
     private async createFoosGreaterThan10(hello: string = "world") {
         const client = getClient();
 
-        await Promise.all([0,1,2,3,4,5].map(i => client.post({
+        await Promise.all([0, 1, 2, 3, 4, 5].map(i => client.post({
             bar: 5,
             foo: i === 0 ? 17 : Math.floor(Math.random() * 30),
             hello: hello
@@ -486,9 +595,25 @@ export class DavenportTestFixture {
     }
 
     private hasDoc(arg: ViewRow<TestObject>): arg is ViewRowWithDoc<TestObject> {
-      return (arg as ViewRowWithDoc<TestObject>).doc !== undefined;
+        return (arg as ViewRowWithDoc<TestObject>).doc !== undefined;
     }
-    
+
+    private isBulkError(arg): arg is BulkDocumentError {
+        const typed: BulkDocumentError = arg;
+
+        return !!typed.error;
+    }
+
+    private guid() {
+        // From https://stackoverflow.com/a/2117523
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+            const r = Math.random() * 16 | 0;
+            const v = c === 'x' ? r : (r & 0x3 | 0x8);
+
+            return v.toString(16);
+        });
+    }
+
     private checkViewRows(rows: ViewRow<TestObject>[]) {
         const errors = rows.reduce((errors, row) => {
             function pushError(prop: string, expectedType: string) {
@@ -499,47 +624,47 @@ export class DavenportTestFixture {
             };
 
             if (this.hasDoc(row)) {
-              if (! row.doc) {
-                errors.push({property: "row.doc", message: "row.doc was not found."});
-              }
+                if (!row.doc) {
+                    errors.push({ property: "row.doc", message: "row.doc was not found." });
+                }
             }
 
-            if (typeof(row.id) !== "string") {
+            if (typeof (row.id) !== "string") {
                 pushError("row.id", "string");
             }
 
-            if (! row.key) {
-                errors.push({property: "row.key", message: "row.key was not found."})
+            if (!row.key) {
+                errors.push({ property: "row.key", message: "row.key was not found." })
             }
 
-            if (! row.value) {
-                errors.push({property: "row.value", message: "row.value was not found."})
+            if (!row.value) {
+                errors.push({ property: "row.value", message: "row.value was not found." })
 
                 return errors;
             }
 
-            if (typeof(row.value.bar) !== "number") {
+            if (typeof (row.value.bar) !== "number") {
                 pushError("row.value.bar", "number");
             }
 
-            if (typeof(row.value.foo) !== "number") {
+            if (typeof (row.value.foo) !== "number") {
                 pushError("row.value.foo", "number");
             }
 
-            if (typeof(row.value.hello) !== "string") {
+            if (typeof (row.value.hello) !== "string") {
                 pushError("row.value.hello", "string");
             }
 
-            if (typeof(row.value._id) !== "string") {
+            if (typeof (row.value._id) !== "string") {
                 pushError("row.value._id", "string");
             }
 
-            if (typeof(row.value._rev) !== "string") {
+            if (typeof (row.value._rev) !== "string") {
                 pushError("row.value._rev", "string");
             }
 
             return errors;
-        }, [] as {property: string; message: string;}[]);
+        }, [] as { property: string; message: string; }[]);
 
         if (errors.length > 0) {
             inspect("View row errors: ", errors);

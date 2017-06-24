@@ -135,7 +135,7 @@ export async function configureDatabase<DocType extends CouchDoc>(databaseUrl: s
             });
 
             if (shouldUpdate) {
-                inspect(`Davenport: Creating or updating design doc "${designDoc.name}".`);
+                inspect(`Davenport: Creating or updating design doc "${designDoc.name}" for database "${configuration.name}".`);
 
                 const result = await ax.put(url, docFromDatabase, {
                     headers: {
@@ -144,7 +144,7 @@ export async function configureDatabase<DocType extends CouchDoc>(databaseUrl: s
                 });
 
                 if (!isOkay(result)) {
-                    inspect(`Davenport: Could not create or update CouchDB design doc "${designDoc.name}". ${result.status} ${result.statusText}`, result.data);
+                    inspect(`Davenport: Could not create or update CouchDB design doc "${designDoc.name}" for database "${configuration.name}". ${result.status} ${result.statusText}`, result.data);
                 }
             }
 
@@ -167,6 +167,12 @@ export class Client<T extends CouchDoc> {
     private axios: AxiosInstance;
 
     private databaseUrl: string;
+
+    private get jsonContentTypeHeaders() {
+        return {
+            "Content-Type": "application/json"
+        }
+    }
 
     private getOption(name: keyof ClientOptions) {
         if (!this.options) {
@@ -194,9 +200,7 @@ export class Client<T extends CouchDoc> {
      */
     public async find(options: FindOptions<T>): Promise<T[]> {
         const result = await this.axios.post(`${this.databaseUrl}/_find`, options, {
-            headers: {
-                "Content-Type": "application/json"
-            },
+            headers: this.jsonContentTypeHeaders
         });
 
         const body = await this.checkErrorAndGetBody(result);
@@ -281,13 +285,39 @@ export class Client<T extends CouchDoc> {
     }
 
     /**
+     * Inserts, updates or deletes multiple documents at the same time. 
+     * 
+     * Omitting the `_id` property from a document will cause CouchDB to generate the id itself.
+     * 
+     * When updating a document, the `_rev` property is required.
+     * 
+     * To delete a document, set the `_deleted` property to `true`. 
+     * 
+     * Note that CouchDB will return in the response an id and revision for every document passed as content to a bulk insert, even for those that were just deleted.  
+     * 
+     * If the `_rev` does not match the current version of the document, then that particular document will not be saved and will be reported as a conflict, but this does not prevent other documents in the batch from being saved. 
+     * 
+     * If the `newEdits` arg is `false` (to push existing revisions instead of creating new ones) the response will not include entries for any of the successful revisions (since their rev IDs are already known to the sender), only for the ones that had errors. Also, the `"conflict"` error will never appear, since in this mode conflicts are allowed. 
+     * 
+     * @param docs An array of documents that will be inserted, updated or deleted.
+     * @param newEdits A boolean that determines whether to allow new edits or not. 
+     */
+    public async bulk(docs: T[], newEdits = true): Promise<BulkResponse> {
+        const result = await this.axios.post(this.databaseUrl + "_bulk_docs", { docs }, {
+            headers: this.jsonContentTypeHeaders,
+            params: { new_edits: newEdits }
+        })
+        const body = await this.checkErrorAndGetBody(result);
+
+        return body;
+    }
+
+    /**
      * Creates a document with a random id. By CouchDB convention, this will only return the id and revision id of the new document, not the document itself.
      */
     public async post(data: T): Promise<PostPutCopyResponse> {
         const result = await this.axios.post(this.databaseUrl, data, {
-            headers: {
-                "Content-Type": "application/json"
-            },
+            headers: this.jsonContentTypeHeaders
         });
         const body: CouchResponse = await this.checkErrorAndGetBody(result);
 
@@ -306,9 +336,7 @@ export class Client<T extends CouchDoc> {
         }
 
         const result = await this.axios.put(this.databaseUrl + id, data, {
-            headers: {
-                "Content-Type": "application/json"
-            },
+            headers: this.jsonContentTypeHeaders,
             params: { rev }
         });
         const body: CouchResponse = await this.checkErrorAndGetBody(result);
@@ -509,6 +537,14 @@ export interface PostPutCopyResponse {
     id: string;
     rev: string;
 }
+
+export interface BulkDocumentError {
+    id: string;
+    error: "conflict" | "forbidden" | "unauthorized";
+    reason: string | "Document update conflict.";
+}
+
+export type BulkResponse = (PostPutCopyResponse | BulkDocumentError)[]
 
 export interface ViewOptions extends ListOptions {
     reduce?: boolean;
