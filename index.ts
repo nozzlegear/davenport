@@ -539,12 +539,12 @@ export interface CouchDoc {
     /**
      * The object's database id.
      */
-    _id?: string;
+    _id: string;
 
     /**
      * The object's database revision.
      */
-    _rev?: string;
+    _rev: string;
 }
 
 export interface PostPutCopyResponse {
