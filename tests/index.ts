@@ -92,7 +92,9 @@ export class DavenportTestFixture {
         const insert = await client.post({
             bar: 117,
             foo: 22,
-            hello: "world"
+            hello: "world",
+            _id: undefined,
+            _rev: undefined
         })
     }
 
@@ -171,7 +173,9 @@ export class DavenportTestFixture {
         const result = await client.post({
             bar: 5,
             foo: 4,
-            hello: "world"
+            hello: "world",
+            _id: undefined,
+            _rev: undefined
         });
 
         Expect(typeof (result.id)).toBe("string");
@@ -185,7 +189,9 @@ export class DavenportTestFixture {
         const createResult = await client.post({
             bar: 5,
             foo: 4,
-            hello: "world"
+            hello: "world",
+            _id: undefined,
+            _rev: undefined
         });
         const result = await client.get(createResult.id);
 
@@ -201,12 +207,16 @@ export class DavenportTestFixture {
         const createResult = await client.post({
             bar: 5,
             foo: 4,
-            hello: "world"
+            hello: "world",
+            _id: undefined,
+            _rev: undefined
         });
         const putResult = await client.put(createResult.id, {
             bar: 4,
             foo: 3,
             hello: "world",
+            _id: undefined,
+            _rev: undefined
         }, createResult.rev);
         const result = await client.get(putResult.id, putResult.rev);
 
@@ -270,7 +280,9 @@ export class DavenportTestFixture {
             await client.post({
                 bar: i,
                 foo: i + 1,
-                hello: uuid
+                hello: uuid,
+                _id: undefined,
+                _rev: undefined
             })
         };
 
@@ -291,7 +303,9 @@ export class DavenportTestFixture {
             await client.post({
                 bar: i,
                 foo: i + 1,
-                hello: uuid
+                hello: uuid,
+                _id: undefined,
+                _rev: undefined
             })
         };
 
@@ -311,7 +325,9 @@ export class DavenportTestFixture {
         const createResult = await client.post({
             bar: 5,
             foo: 4,
-            hello: "world"
+            hello: "world",
+            _id: undefined,
+            _rev: undefined
         });
         let error;
 
@@ -331,7 +347,9 @@ export class DavenportTestFixture {
         const createResult = await client.post({
             bar: 5,
             foo: 4,
-            hello: "world"
+            hello: "world",
+            _id: undefined,
+            _rev: undefined
         });
         const exists = await client.exists(createResult.id);
 
@@ -347,6 +365,8 @@ export class DavenportTestFixture {
             bar: 5,
             foo: 4,
             hello: uuid,
+            _id: undefined,
+            _rev: undefined
         })
         const exists = await client.existsByFieldValue(uuid, "hello");
 
@@ -362,6 +382,8 @@ export class DavenportTestFixture {
             bar: 5,
             foo: 4,
             hello: uuid,
+            _id: undefined,
+            _rev: undefined
         })
         const exists = await client.existsBySelector({
             hello: {
@@ -380,7 +402,9 @@ export class DavenportTestFixture {
         const createResult = await client.post({
             bar: 5,
             foo: 4,
-            hello: uuid
+            hello: uuid,
+            _id: undefined,
+            _rev: undefined
         });
         const copyResult = await client.copy(createResult.id, uuid);
         const result = await client.get(copyResult.id);
@@ -397,7 +421,9 @@ export class DavenportTestFixture {
             await client.post({
                 bar: 5,
                 foo: 4,
-                hello: "shwoop"
+                hello: "shwoop",
+                _id: undefined,
+                _rev: undefined
             })
         }
 
@@ -522,7 +548,9 @@ export class DavenportTestFixture {
         const docs = [...Array(100).keys()].map<TestObject>(i => ({
             bar: i,
             foo: i * 3,
-            hello: "world"
+            hello: "world",
+            _id: undefined,
+            _rev: undefined
         }))
 
         const client = getClient();
@@ -545,7 +573,8 @@ export class DavenportTestFixture {
                 _id: id,
                 bar: i,
                 foo: i * 4,
-                hello: "goodbye"
+                hello: "goodbye",
+                _rev: undefined
             }
         })
         const client = getClient();
@@ -565,7 +594,9 @@ export class DavenportTestFixture {
         const existingDocs = await client.bulk([...Array(totalExisting).keys()].map<TestObject>(i => ({
             bar: i,
             foo: i * 5,
-            hello: "I'm an existing doc, used with the bulkWithConflicts test."
+            hello: "I'm an existing doc, used with the bulkWithConflicts test.",
+            _id: undefined,
+            _rev: undefined
         })));
         const result = await client.bulk([...Array(totalOperations).keys()].map<TestObject>(i => {
             const existingDoc = existingDocs[i];
@@ -573,6 +604,7 @@ export class DavenportTestFixture {
 
             return {
                 _id: id,
+                _rev: undefined,
                 bar: i,
                 foo: i * 5,
                 hello: "I'm a generated doc, used with the bulkWIthConflicts test."
@@ -597,7 +629,9 @@ export class DavenportTestFixture {
         await Promise.all([0, 1, 2, 3, 4, 5].map(i => client.post({
             bar: 5,
             foo: i === 0 ? 17 : Math.floor(Math.random() * 30),
-            hello: hello
+            hello: hello,
+            _id: undefined,
+            _rev: undefined
         })));
     }
 
