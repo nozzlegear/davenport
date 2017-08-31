@@ -23,6 +23,7 @@ import {
     Timeout
     } from 'alsatian';
 import { DavenportError } from '../index';
+import range = require("lodash/range");
 
 const DB_URL = "http://localhost:5984";
 const DB_NAME = "davenport_tests";
@@ -519,7 +520,7 @@ export class DavenportTestFixture {
     @AsyncTest("Davenport.bulk insert with auto-generated ids.")
     @Timeout(5000)
     public async bulkTest() {
-        const docs = [...Array(100).keys()].map<TestObject>(i => ({
+        const docs = range(0, 100).map<TestObject>(i => ({
             bar: i,
             foo: i * 3,
             hello: "world"
@@ -537,7 +538,7 @@ export class DavenportTestFixture {
     @Timeout(5000)
     public async bulkWithCustomIdsTest() {
         const generatedIds: string[] = [];
-        const docs = [...Array(100).keys()].map<TestObject>(i => {
+        const docs = range(0, 100).map<TestObject>(i => {
             const id = this.guid();
             generatedIds.push(id);
 
@@ -562,12 +563,12 @@ export class DavenportTestFixture {
         const client = getClient();
         const totalExisting = 10;
         const totalOperations = 100;
-        const existingDocs = await client.bulk([...Array(totalExisting).keys()].map<TestObject>(i => ({
+        const existingDocs = await client.bulk(range(0, totalExisting).map<TestObject>(i => ({
             bar: i,
             foo: i * 5,
             hello: "I'm an existing doc, used with the bulkWithConflicts test."
         })));
-        const result = await client.bulk([...Array(totalOperations).keys()].map<TestObject>(i => {
+        const result = await client.bulk(range(0, totalOperations).map<TestObject>(i => {
             const existingDoc = existingDocs[i];
             const id = existingDoc ? existingDoc.id : undefined;
 

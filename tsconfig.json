@@ -1,13 +1,16 @@
 {
     "compilerOptions": {
         "module": "commonjs",
-        "target": "es2015",
+        "target": "es5",
         "noImplicitAny": false,
         "sourceMap": true,
         "outDir": "bin",
         "experimentalDecorators": true,
-        "declaration": true
-    }, 
+        "declaration": true,
+        "lib": [
+            "es2015"
+        ]
+    },
     "exclude": [
         "node_modules",
         "bin"
