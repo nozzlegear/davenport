@@ -113,6 +113,7 @@ export async function configureDatabase<DocType extends CouchDoc>(databaseUrl: s
             if (!isOkay) {
                 docFromDatabase = {
                     _id: `_design/${designDoc.name}`,
+                    _rev: undefined,
                     language: "javascript",
                     views: {}
                 }
