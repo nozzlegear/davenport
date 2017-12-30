@@ -1,6 +1,6 @@
 {
   "name": "davenport",
-  "version": "2.8.0-beta1",
+  "version": "2.8.0",
   "description": "A CouchDB client for simplifying common tasks like get, list, create, update and delete. Comes complete with full TypeScript definitions.",
   "main": "bin/index.js",
   "typings": "bin/index.d.ts",
@@ -40,7 +40,7 @@
   "homepage": "https://github.com/nozzlegear/davenport#readme",
   "dependencies": {
     "axios": "^0.15.3",
-    "logspect": "^1.0.2"
+    "logspect": "^1.3.0"
   },
   "devDependencies": {
     "@types/lodash": "^4.14.74",
