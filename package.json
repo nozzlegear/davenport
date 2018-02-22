@@ -1,12 +1,13 @@
 {
   "name": "davenport",
-  "version": "2.8.1",
+  "version": "2.8.2",
   "description": "A CouchDB client for simplifying common tasks like get, list, create, update and delete. Comes complete with full TypeScript definitions.",
   "main": "bin/index.js",
   "typings": "bin/index.d.ts",
   "files": [
     "bin/index.*",
-    "bin/browser.js"
+    "bin/browser.js",
+    "index.ts"
   ],
   "scripts": {
     "build": "rimraf ./bin && tsc -p . && npm run webpack",
