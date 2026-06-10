@@ -9,7 +9,7 @@ import Client, {
   BulkDocumentError,
   ViewRow,
   ViewRowWithDoc,
-} from '../index.js';
+} from '../src/index.js';
 
 const DB_URL = 'http://localhost:5984';
 const DB_NAME = 'davenport_tests';
@@ -170,7 +170,7 @@ describe('Davenport', () => {
     try {
       await client.getDbInfo();
       expect(true).toBe(false); // Should not reach here
-    } catch (err) {
+    } catch (err: any) {
       if (isDavenportError(err)) {
         expect(err.status).toBe(404);
       } else {
@@ -263,7 +263,7 @@ describe('Davenport', () => {
     expect(Array.isArray(list.rows)).toBe(true);
     expect(list.total_rows).toBeGreaterThan(0);
     expect(
-      list.rows.every((r) => {
+      list.rows.every((r: any) => {
         if (r._id?.includes('_design')) return true;
         return (
           !!r &&
@@ -283,7 +283,7 @@ describe('Davenport', () => {
     expect(list.offset).toBe(0);
     expect(Array.isArray(list.rows)).toBe(true);
     expect(list.total_rows).toBeGreaterThan(0);
-    expect(list.rows.every((r) => typeof r.rev === 'string' && typeof (r as any).id === 'undefined')).toBe(true);
+    expect(list.rows.every((r: any) => typeof r.rev === 'string' && typeof (r as any).id === 'undefined')).toBe(true);
   });
 
   it('Davenport.count', async () => {
@@ -370,7 +370,7 @@ describe('Davenport', () => {
       },
     });
     expect(Array.isArray(result)).toBe(true);
-    expect(result.every((r) => r.hello === uuid)).toBe(true);
+    expect(result.every((r: any) => r.hello === uuid)).toBe(true);
   });
 
   it('Davenport.view', async () => {
@@ -400,7 +400,7 @@ describe('Davenport', () => {
     const client = getClient();
     const result = await client.bulk(docs);
     expect(result.length).toBe(100);
-    expect(result.every((item) => !isBulkError(item))).toBe(true);
+    expect(result.every((item: any) => !isBulkError(item))).toBe(true);
     expect(result.every((item: any) => !!item.id && !!item.rev)).toBe(true);
   });
 
@@ -429,7 +429,7 @@ describe('Davenport', () => {
     );
     expect(result.length).toBe(100);
     const conflicts = result.filter(isBulkError);
-    const rest = result.filter((item) => !isBulkError(item));
+    const rest = result.filter((item: any) => !isBulkError(item));
     expect(conflicts.length).toBe(totalExisting);
     expect(rest.length).toBe(totalOperations - totalExisting);
   });
