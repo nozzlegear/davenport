@@ -43,6 +43,11 @@
     "url": "https://github.com/nozzlegear/davenport/issues"
   },
   "homepage": "https://github.com/nozzlegear/davenport#readme",
+  "publishConfig": {
+    "provenance": true,
+    "access": "public"
+  },
+  "dependencies": {},
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "eslint": "^10.4.1",
