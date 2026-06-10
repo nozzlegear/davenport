@@ -19,6 +19,8 @@
     "build": "vite build",
     "test": "vitest run",
     "test:watch": "vitest",
+    "lint": "eslint .",
+    "format": "prettier --write .",
     "prepublishOnly": "npm run build"
   },
   "repository": {
@@ -41,9 +43,13 @@
     "url": "https://github.com/nozzlegear/davenport/issues"
   },
   "homepage": "https://github.com/nozzlegear/davenport#readme",
-  "dependencies": {},
   "devDependencies": {
+    "eslint": "^10.4.1",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.6",
+    "prettier": "^3.8.3",
     "typescript": "^6.0.0",
+    "typescript-eslint": "^8.60.1",
     "vite": "^8.0.0",
     "vite-plugin-dts": "^4.0.0",
     "vitest": "^4.1.8"
