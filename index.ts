@@ -5,9 +5,23 @@ import AxiosLib, {
     AxiosRequestConfig,
     AxiosResponse
     } from 'axios';
-import inspect from 'logspect';
 
 declare const emit: (key: string, value) => void;
+
+export interface Logger {
+    info?: (...args: any[]) => void;
+    warn?: (...args: any[]) => void;
+    error?: (...args: any[]) => void;
+}
+
+/**
+ * Logs a warning if warnings are enabled.
+ */
+function warn(options: ClientOptions | undefined, ...args: any[]) {
+    if (options && options.warnings !== false) {
+        (options.logger?.warn || console.warn)(...args);
+    }
+}
 
 /**
  * Indicates whether the request was a success or not (between 200-300).
@@ -70,7 +84,7 @@ export async function configureDatabase<DocType extends CouchDoc>(databaseUrl: s
     const version = parseInt(infoBody.version);
 
     if (version < 2) {
-        inspect(`Warning: Davenport expects your CouchDB instance to be running CouchDB 2.0 or higher. Version detected: ${version}. Some database methods may not work.`)
+        warn(options, `Warning: Davenport expects your CouchDB instance to be running CouchDB 2.0 or higher. Version detected: ${version}. Some database methods may not work.`)
     }
 
     const putResult = await ax.put(`${databaseUrl}/${configuration.name}`, undefined);
@@ -106,7 +120,7 @@ export async function configureDatabase<DocType extends CouchDoc>(databaseUrl: s
             let docFromDatabase: DesignDoc;
 
             if (!isOkay && getDoc.status !== 404) {
-                inspect(`Davenport: Failed to retrieve design doc "${designDoc.name}". ${getDoc.status} ${getDoc.statusText}`, getDoc.data);
+                warn(options, `Davenport: Failed to retrieve design doc "${designDoc.name}". ${getDoc.status} ${getDoc.statusText}`, getDoc.data);
                 return;
             }
 
@@ -138,7 +152,7 @@ export async function configureDatabase<DocType extends CouchDoc>(databaseUrl: s
             });
 
             if (shouldUpdate) {
-                inspect(`Davenport: Creating or updating design doc "${designDoc.name}" for database "${configuration.name}".`);
+                warn(options, `Davenport: Creating or updating design doc "${designDoc.name}" for database "${configuration.name}".`);
 
                 const result = await ax.put(url, docFromDatabase, {
                     headers: {
@@ -147,7 +161,7 @@ export async function configureDatabase<DocType extends CouchDoc>(databaseUrl: s
                 });
 
                 if (!isOkay(result)) {
-                    inspect(`Davenport: Could not create or update CouchDB design doc "${designDoc.name}" for database "${configuration.name}". ${result.status} ${result.statusText}`, result.data);
+                    warn(options, `Davenport: Could not create or update CouchDB design doc "${designDoc.name}" for database "${configuration.name}". ${result.status} ${result.statusText}`, result.data);
                 }
             }
 
@@ -209,7 +223,7 @@ export class Client<T extends CouchDoc> {
         const body = await this.checkErrorAndGetBody(result);
 
         if (body.warning && !!this.getOption("warnings")) {
-            inspect("Davenport warning: Davenport.find result contained warning:", body.warning);
+            warn(this.options, "Davenport warning: Davenport.find result contained warning:", body.warning);
         }
 
         return body.docs;
@@ -335,7 +349,7 @@ export class Client<T extends CouchDoc> {
      */
     public async put(id: string, data: T, rev: string): Promise<PostPutCopyResponse> {
         if (!rev && !!this.getOption("warnings")) {
-            inspect(`Davenport warning: no revision specified for Davenport.put function with id ${id}. This may cause a document conflict error.`);
+            warn(this.options, `Davenport warning: no revision specified for Davenport.put function with id ${id}. This may cause a document conflict error.`);
         }
 
         const result = await this.axios.put(this.databaseUrl + id, data, {
@@ -374,7 +388,7 @@ export class Client<T extends CouchDoc> {
      */
     public async delete(id: string, rev: string): Promise<void> {
         if (!rev && !!this.getOption("warnings")) {
-            inspect(`Davenport warning: no revision specified for Davenport.delete function with id ${id}. This may cause a document conflict error.`);
+            warn(this.options, `Davenport warning: no revision specified for Davenport.delete function with id ${id}. This may cause a document conflict error.`);
         }
 
         const result = await this.axios.delete(this.databaseUrl + id, {
@@ -522,7 +536,7 @@ export class DavenportError extends Error {
         this.status = fullResponse.status;
         this.statusText = fullResponse.statusText;
         this.body = fullResponse.data;
-        this.url = fullResponse.headers.host || fullResponse.headers.HOST;
+        this.url = (fullResponse.headers as any).host || (fullResponse.headers as any).HOST;
     }
 
     public readonly isDavenport = true;
@@ -702,6 +716,11 @@ export interface ClientOptions {
     warnings?: boolean;
 
     /**
+     * Custom logger interface.
+     */
+    logger?: Logger;
+
+    /**
      * Username used to make requests with basic auth.
      */
     username?: string;
@@ -714,7 +733,7 @@ export interface ClientOptions {
     /**
      * Proxy configuration object.
      */
-    proxy?: AxiosProxyConfig;
+    proxy?: any;
 }
 
 export interface PropSelector {
