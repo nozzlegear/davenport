@@ -1,11 +1,3 @@
-import AxiosLib, {
-    AxiosBasicCredentials,
-    AxiosInstance,
-    AxiosProxyConfig,
-    AxiosRequestConfig,
-    AxiosResponse
-    } from 'axios';
-
 declare const emit: (key: string, value) => void;
 
 export interface Logger {
@@ -26,15 +18,15 @@ function warn(options: ClientOptions | undefined, ...args: any[]) {
 /**
  * Indicates whether the request was a success or not (between 200-300).
  */
-function isOkay(response: AxiosResponse) {
+function isOkay(response: Response) {
     return response.status >= 200 && response.status < 300;
 }
 
 /**
  * Determines whether an object is a DavenportError.
  */
-export function isDavenportError(error): error is DavenportError {
-    return error.isDavenport;
+export function isDavenportError(error: any): error is DavenportError {
+    return !!error && error.isDavenport === true;
 }
 
 /**
@@ -42,56 +34,34 @@ export function isDavenportError(error): error is DavenportError {
  */
 export const GENERIC_LIST_VIEW = {
     "name": "all",
-    "map": function (doc) { emit(doc._id, doc); }.toString(),
+    "map": function (doc: any) { emit(doc._id, doc); }.toString(),
     "reduce": "_count"
-}
-
-/**
- * Configures an instance of Axios with auth and validation defaults.
- */
-function getAxiosInstance(options: ClientOptions): AxiosInstance {
-    let auth: AxiosBasicCredentials;
-
-    if (options && (options.username || options.password)) {
-        auth = {
-            username: options.username,
-            password: options.password,
-        }
-    }
-
-    const instance = AxiosLib.create({
-        // Like fetch, Axios should never throw an error if it receives a response
-        validateStatus: (status) => true,
-        auth: auth,
-        proxy: options && options.proxy
-    });
-
-    return instance;
 }
 
 /**
  * Configures a Davenport client and database by validating the CouchDB version, creating indexes and design documents, and then returning a client to interact with the database.
  */
 export async function configureDatabase<DocType extends CouchDoc>(databaseUrl: string, configuration: DatabaseConfiguration<DocType>, options?: ClientOptions): Promise<Client<DocType>> {
-    const ax = getAxiosInstance(options);
-    const dbInfo = await ax.get(databaseUrl);
+    const client = new Client<DocType>(databaseUrl, configuration.name, options);
+    const dbInfoResponse = await client.request(databaseUrl, { method: "GET" });
 
-    if (!isOkay(dbInfo)) {
-        throw new Error(`Failed to connect to CouchDB instance at ${databaseUrl}. ${dbInfo.status} ${dbInfo.statusText}`);
+    if (!isOkay(dbInfoResponse)) {
+        throw new Error(`Failed to connect to CouchDB instance at ${databaseUrl}. ${dbInfoResponse.status} ${dbInfoResponse.statusText}`);
     }
 
-    const infoBody = dbInfo.data as { version: string };
+    const infoBody = await dbInfoResponse.json() as { version: string };
     const version = parseInt(infoBody.version);
 
     if (version < 2) {
         warn(options, `Warning: Davenport expects your CouchDB instance to be running CouchDB 2.0 or higher. Version detected: ${version}. Some database methods may not work.`)
     }
 
-    const putResult = await ax.put(`${databaseUrl}/${configuration.name}`, undefined);
+    const putResult = await client.request(`${databaseUrl}/${configuration.name}`, { method: "PUT" });
     const preconditionFailed = 412; /* Precondition Failed - Database already exists. */
 
     if (putResult.status !== preconditionFailed && !isOkay(putResult)) {
-        throw new DavenportError(`${putResult.status} ${putResult.statusText} ${putResult.data}`, putResult);
+        const body = await putResult.text();
+        throw new DavenportError(`${putResult.status} ${putResult.statusText} ${body}`, putResult, body);
     }
 
     if (Array.isArray(configuration.indexes) && configuration.indexes.length > 0) {
@@ -101,30 +71,31 @@ export async function configureDatabase<DocType extends CouchDoc>(databaseUrl: s
             },
             name: `${configuration.name}-indexes`,
         };
-        const result = await ax.post(`${databaseUrl}/${configuration.name}/_index`, data, {
-            headers: {
-                "Content-Type": "application/json"
-            },
+        const result = await client.request(`${databaseUrl}/${configuration.name}/_index`, {
+            method: "POST",
+            body: data,
         });
 
         if (!isOkay(result)) {
-            throw new DavenportError(`Error creating CouchDB indexes on database ${configuration.name}.`, result);
+            const body = await result.text();
+            throw new DavenportError(`Error creating CouchDB indexes on database ${configuration.name}.`, result, body);
         }
     }
 
     if (Array.isArray(configuration.designDocs) && configuration.designDocs.length > 0) {
         await Promise.all(configuration.designDocs.map(async designDoc => {
             const url = `${databaseUrl}/${configuration.name}/_design/${designDoc.name}`;
-            const getDoc = await ax.get(url);
-            const okay = isOkay(getDoc);
+            const getDocResponse = await client.request(url, { method: "GET" });
+            const okay = isOkay(getDocResponse);
             let docFromDatabase: DesignDoc;
 
-            if (!isOkay && getDoc.status !== 404) {
-                warn(options, `Davenport: Failed to retrieve design doc "${designDoc.name}". ${getDoc.status} ${getDoc.statusText}`, getDoc.data);
+            if (!okay && getDocResponse.status !== 404) {
+                const body = await getDocResponse.text();
+                warn(options, `Davenport: Failed to retrieve design doc "${designDoc.name}". ${getDocResponse.status} ${getDocResponse.statusText}`, body);
                 return;
             }
 
-            if (!isOkay) {
+            if (!okay) {
                 docFromDatabase = {
                     _id: `_design/${designDoc.name}`,
                     _rev: undefined,
@@ -132,7 +103,7 @@ export async function configureDatabase<DocType extends CouchDoc>(databaseUrl: s
                     views: {}
                 }
             } else {
-                docFromDatabase = getDoc.data;
+                docFromDatabase = await getDocResponse.json();
             }
 
             const docViews = designDoc.views;
@@ -154,22 +125,20 @@ export async function configureDatabase<DocType extends CouchDoc>(databaseUrl: s
             if (shouldUpdate) {
                 warn(options, `Davenport: Creating or updating design doc "${designDoc.name}" for database "${configuration.name}".`);
 
-                const result = await ax.put(url, docFromDatabase, {
-                    headers: {
-                        "Content-Type": "application/json",
-                    }
+                const result = await client.request(url, {
+                    method: "PUT",
+                    body: docFromDatabase,
                 });
 
                 if (!isOkay(result)) {
-                    warn(options, `Davenport: Could not create or update CouchDB design doc "${designDoc.name}" for database "${configuration.name}". ${result.status} ${result.statusText}`, result.data);
+                    const body = await result.text();
+                    warn(options, `Davenport: Could not create or update CouchDB design doc "${designDoc.name}" for database "${configuration.name}". ${result.status} ${result.statusText}`, body);
                 }
             }
-
-            return Promise.resolve();
         }));
     }
 
-    return new Client<DocType>(databaseUrl, configuration.name, options);
+    return client;
 }
 
 /**
@@ -177,19 +146,10 @@ export async function configureDatabase<DocType extends CouchDoc>(databaseUrl: s
  */
 export class Client<T extends CouchDoc> {
     constructor(private baseUrl: string, private databaseName: string, private options: ClientOptions = { warnings: true }) {
-        this.databaseUrl = `${baseUrl}/${databaseName}/`;
-        this.axios = getAxiosInstance(options);
+        this.databaseUrl = this.baseUrl.endsWith("/") ? `${this.baseUrl}${this.databaseName}/` : `${this.baseUrl}/${this.databaseName}/`;
     }
-
-    private axios: AxiosInstance;
 
     private databaseUrl: string;
-
-    private get jsonContentTypeHeaders() {
-        return {
-            "Content-Type": "application/json"
-        }
-    }
 
     private getOption(name: keyof ClientOptions) {
         if (!this.options) {
@@ -200,24 +160,57 @@ export class Client<T extends CouchDoc> {
     }
 
     /**
-     * Checks that the Axios response is okay. If not, a DavenPort error is thrown.
+     * Executes a fetch request with the given options.
      */
-    private async checkErrorAndGetBody(result: AxiosResponse) {
-        if (!isOkay(result)) {
-            const message = `Error with ${result.config.method} request for CouchDB database ${this.databaseName} at ${result.config.url}. ${result.status} ${result.statusText}`;
-
-            throw new DavenportError(message, result);
+    public async request(url: string, requestOptions: { method: string, body?: any, params?: any, headers?: any }): Promise<Response> {
+        const fullUrl = new URL(url);
+        if (requestOptions.params) {
+            Object.keys(requestOptions.params).forEach(key => {
+                const value = requestOptions.params[key];
+                if (value !== undefined) {
+                    fullUrl.searchParams.append(key, typeof value === "string" ? value : JSON.stringify(value));
+                }
+            });
         }
 
-        return result.data;
+        const headers = new Headers(requestOptions.headers);
+        if (!headers.has("Content-Type") && requestOptions.body) {
+            headers.set("Content-Type", "application/json");
+        }
+
+        if (this.options.username || this.options.password) {
+            const auth = btoa(`${this.options.username || ""}:${this.options.password || ""}`);
+            headers.set("Authorization", `Basic ${auth}`);
+        }
+
+        return fetch(fullUrl.toString(), {
+            method: requestOptions.method,
+            headers,
+            body: requestOptions.body ? JSON.stringify(requestOptions.body) : undefined,
+        });
+    }
+
+    /**
+     * Checks that the response is okay. If not, a DavenPort error is thrown.
+     */
+    private async checkErrorAndGetBody(result: Response) {
+        if (!isOkay(result)) {
+            const body = await result.text();
+            const message = `Error with ${result.status} request for CouchDB database ${this.databaseName} at ${result.url}. ${result.status} ${result.statusText}`;
+
+            throw new DavenportError(message, result, body);
+        }
+
+        return result.json();
     };
 
     /**
      * Find matching documents according to the selector.
      */
     public async find(options: FindOptions<T>): Promise<T[]> {
-        const result = await this.axios.post(`${this.databaseUrl}/_find`, options, {
-            headers: this.jsonContentTypeHeaders
+        const result = await this.request(`${this.databaseUrl}_find`, {
+            method: "POST",
+            body: options,
         });
 
         const body = await this.checkErrorAndGetBody(result);
@@ -233,7 +226,8 @@ export class Client<T extends CouchDoc> {
      * Lists documents in the database. Warning: this result WILL list design documents, and it will force the `include_docs` option to false. If you need to include docs, use .listWithDocs.
      */
     public async listWithoutDocs(options: ListOptions = {}): Promise<ListResponse<{ rev: string }>> {
-        const result = await this.axios.get(`${this.databaseUrl}/_all_docs`, {
+        const result = await this.request(`${this.databaseUrl}_all_docs`, {
+            method: "GET",
             params: { ...this.encodeOptions(options), include_docs: false }
         });
         const body = await this.checkErrorAndGetBody(result) as AllDocsListResult<T>;
@@ -249,7 +243,8 @@ export class Client<T extends CouchDoc> {
      * Lists documents in the database. Warning: this result WILL list design documents, and it will force the `include_docs` option to true. If you don't need to include docs, use .listWithoutDocs.
      */
     public async listWithDocs(options: ListOptions = {}): Promise<ListResponse<T>> {
-        const result = await this.axios.get(`${this.databaseUrl}/_all_docs`, {
+        const result = await this.request(`${this.databaseUrl}_all_docs`, {
+            method: "GET",
             params: { ...this.encodeOptions(options), include_docs: true }
         });
         const body = await this.checkErrorAndGetBody(result) as AllDocsListResult<T>;
@@ -265,7 +260,8 @@ export class Client<T extends CouchDoc> {
      * Counts all documents in the database. Warning: this result WILL include design documents.
      */
     public async count(): Promise<number> {
-        const result = await this.axios.get(`${this.databaseUrl}/_all_docs`, {
+        const result = await this.request(`${this.databaseUrl}_all_docs`, {
+            method: "GET",
             params: {
                 limit: 0,
             }
@@ -280,7 +276,7 @@ export class Client<T extends CouchDoc> {
      */
     public async countBySelector(selector: DocSelector<T>): Promise<number>
     public async countBySelector(selector: Partial<T>): Promise<number>
-    public async countBySelector(selector): Promise<number> {
+    public async countBySelector(selector: any): Promise<number> {
         const result = await this.find({
             fields: ["_id"],
             selector,
@@ -293,7 +289,8 @@ export class Client<T extends CouchDoc> {
      * Gets a document with the given id and optional revision id.
      */
     public async get(id: string, rev?: string): Promise<T> {
-        const result = await this.axios.get(this.databaseUrl + id, {
+        const result = await this.request(this.databaseUrl + id, {
+            method: "GET",
             params: { rev }
         });
         const body = await this.checkErrorAndGetBody(result);
@@ -320,8 +317,9 @@ export class Client<T extends CouchDoc> {
      * @param newEdits A boolean that determines whether to allow new edits or not. 
      */
     public async bulk(docs: T[], newEdits = true): Promise<BulkResponse> {
-        const result = await this.axios.post(this.databaseUrl + "_bulk_docs", { docs }, {
-            headers: this.jsonContentTypeHeaders,
+        const result = await this.request(this.databaseUrl + "_bulk_docs", {
+            method: "POST",
+            body: { docs },
             params: { new_edits: newEdits }
         })
         const body = await this.checkErrorAndGetBody(result);
@@ -333,8 +331,9 @@ export class Client<T extends CouchDoc> {
      * Creates a document with a random id. By CouchDB convention, this will only return the id and revision id of the new document, not the document itself.
      */
     public async post(data: T): Promise<PostPutCopyResponse> {
-        const result = await this.axios.post(this.databaseUrl, data, {
-            headers: this.jsonContentTypeHeaders
+        const result = await this.request(this.databaseUrl, {
+            method: "POST",
+            body: data,
         });
         const body: CouchResponse = await this.checkErrorAndGetBody(result);
 
@@ -352,8 +351,9 @@ export class Client<T extends CouchDoc> {
             warn(this.options, `Davenport warning: no revision specified for Davenport.put function with id ${id}. This may cause a document conflict error.`);
         }
 
-        const result = await this.axios.put(this.databaseUrl + id, data, {
-            headers: this.jsonContentTypeHeaders,
+        const result = await this.request(this.databaseUrl + id, {
+            method: "PUT",
+            body: data,
             params: { rev }
         });
         const body: CouchResponse = await this.checkErrorAndGetBody(result);
@@ -368,8 +368,7 @@ export class Client<T extends CouchDoc> {
      * Copies the document with the given id and assigns the new id to the copy. By CouchDB convention, this will only return the id and revision id of the new document, not the document itself.
      */
     public async copy(id: string, newId: string): Promise<PostPutCopyResponse> {
-        const result = await this.axios.request({
-            url: this.databaseUrl + id,
+        const result = await this.request(this.databaseUrl + id, {
             method: "COPY",
             headers: {
                 Destination: newId
@@ -391,7 +390,8 @@ export class Client<T extends CouchDoc> {
             warn(this.options, `Davenport warning: no revision specified for Davenport.delete function with id ${id}. This may cause a document conflict error.`);
         }
 
-        const result = await this.axios.delete(this.databaseUrl + id, {
+        const result = await this.request(this.databaseUrl + id, {
+            method: "DELETE",
             params: { rev }
         });
 
@@ -402,7 +402,7 @@ export class Client<T extends CouchDoc> {
      * Checks that a document with the given id exists.
      */
     public async exists(id: string): Promise<boolean> {
-        const result = await this.axios.head(this.databaseUrl + id);
+        const result = await this.request(this.databaseUrl + id, { method: "HEAD" });
 
         return result.status === 200;
     }
@@ -410,7 +410,7 @@ export class Client<T extends CouchDoc> {
     /**
      * Checks that a document that matches the field value exists.
      */
-    public async existsByFieldValue(value, field: keyof T): Promise<boolean> {
+    public async existsByFieldValue(value: any, field: keyof T): Promise<boolean> {
         const findResult = await this.find({
             fields: ["_id"],
             limit: 1,
@@ -440,12 +440,14 @@ export class Client<T extends CouchDoc> {
      */
     public async view<DocType>(designDocName: string, viewName: string, options: ViewOptions = { reduce: false }): Promise<ViewResult<DocType>> {
         // Ensure reduce is set to false unless explicitly set by the caller.
-        if (typeof (options.reduce) !== "boolean") {
-            options.reduce = false;
+        const viewOptions = { ...options };
+        if (typeof (viewOptions.reduce) !== "boolean") {
+            viewOptions.reduce = false;
         }
 
-        const result = await this.axios.get(`${this.databaseUrl}_design/${designDocName}/_view/${viewName}`, {
-            params: this.encodeOptions(options),
+        const result = await this.request(`${this.databaseUrl}_design/${designDocName}/_view/${viewName}`, {
+            method: "GET",
+            params: this.encodeOptions(viewOptions),
         });
         const body = await this.checkErrorAndGetBody(result);
 
@@ -456,7 +458,8 @@ export class Client<T extends CouchDoc> {
      * Executes a view with the given designDocName and viewName. This method will never reduce the result.
      */
     public async viewWithDocs<DocType>(designDocName: string, viewName: string, options: ViewOptions = { reduce: false }): Promise<ViewResultWithDocs<DocType>> {
-        const result = await this.axios.get(`${this.databaseUrl}_design/${designDocName}/_view/${viewName}`, {
+        const result = await this.request(`${this.databaseUrl}_design/${designDocName}/_view/${viewName}`, {
+            method: "GET",
             params: { ...this.encodeOptions(options), reduce: false, include_docs: true }
         });
         const body = await this.checkErrorAndGetBody(result);
@@ -468,7 +471,7 @@ export class Client<T extends CouchDoc> {
      * Creates the database associated with this client.
      */
     public async createDb(url: string = this.databaseUrl): Promise<CreateDatabaseResponse> {
-        const result = await this.axios.put(url);
+        const result = await this.request(url, { method: "PUT" });
 
         if (result.status === 412) {
             return {
@@ -489,7 +492,7 @@ export class Client<T extends CouchDoc> {
      * Deletes the database associated with this client.
      */
     public async deleteDb(url: string = this.databaseUrl): Promise<BasicCouchResponse> {
-        const result = await this.axios.delete(url);
+        const result = await this.request(url, { method: "DELETE" });
 
         return await this.checkErrorAndGetBody(result);
     }
@@ -498,7 +501,7 @@ export class Client<T extends CouchDoc> {
      * Returns database info for the given database.
      */
     public async getDbInfo(url: string = this.databaseUrl): Promise<DbInfo> {
-        const result = await this.axios.get(url);
+        const result = await this.request(url, { method: "GET" });
 
         return await this.checkErrorAndGetBody(result);
     }
@@ -506,18 +509,18 @@ export class Client<T extends CouchDoc> {
     private encodeOptions(options: ListOptions): object {
         let keys = Object.getOwnPropertyNames(options || {}) as (keyof ListOptions)[];
 
-        return keys.reduce((requestOptions, key) => {
+        return keys.reduce((requestOptions: any, key) => {
             switch (key) {
                 case "keys":
                 case "key":
                 case "start_key":
                 case "end_key":
-                    requestOptions[key] = JSON.stringify(options[key]);
+                    requestOptions[key] = JSON.stringify((options as any)[key]);
 
                     break;
 
                 default:
-                    requestOptions[key] = options[key];
+                    requestOptions[key] = (options as any)[key];
 
                     break;
             }
@@ -530,13 +533,12 @@ export class Client<T extends CouchDoc> {
 export default Client;
 
 export class DavenportError extends Error {
-    constructor(message, public fullResponse: AxiosResponse) {
+    constructor(message: string, public fullResponse: Response, public body: any) {
         super(message);
 
         this.status = fullResponse.status;
         this.statusText = fullResponse.statusText;
-        this.body = fullResponse.data;
-        this.url = (fullResponse.headers as any).host || (fullResponse.headers as any).HOST;
+        this.url = fullResponse.url;
     }
 
     public readonly isDavenport = true;
@@ -546,8 +548,6 @@ export class DavenportError extends Error {
     public statusText: string;
 
     public url: string;
-
-    public body: any;
 }
 
 export interface CouchDoc {
