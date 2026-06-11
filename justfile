@@ -14,7 +14,35 @@ build:
 # Run tests
 [group("test")]
 test:
-    npm test
+    #!/usr/bin/env bash
+    set -e
+    CONF_DIR=$(mktemp -d /tmp/davenport-docker-config.XXXXXX)
+    cleanup() {
+        echo "Cleaning up..."
+        rm -rf "$CONF_DIR"
+        just cleanup-test-containers
+    }
+    trap cleanup EXIT
+    DOCKER_CONFIG="$CONF_DIR" TESTCONTAINERS_RYUK_PRIVILEGED=true npm test
+
+# Run tests in watch mode
+[group("test")]
+test-watch:
+    #!/usr/bin/env bash
+    set -e
+    CONF_DIR=$(mktemp -d /tmp/davenport-docker-config.XXXXXX)
+    cleanup() {
+        echo "Cleaning up..."
+        rm -rf "$CONF_DIR"
+        just cleanup-test-containers
+    }
+    trap cleanup EXIT
+    DOCKER_CONFIG="$CONF_DIR" TESTCONTAINERS_RYUK_PRIVILEGED=true npm run test:watch
+
+# Cleanup any lingering test containers
+[group("test")]
+cleanup-test-containers:
+    @docker ps -a --filter "name=davenport-test-" --format "{{"{{.ID}}"}}" | xargs -r docker rm -f
 
 # Lint and format
 [group("lint")]

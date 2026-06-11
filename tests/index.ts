@@ -1,22 +1,22 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { CouchDBContainer, StartedCouchDBContainer } from '@testcontainers/couchdb';
+
 import Client, {
   ClientOptions,
   configureDatabase,
   CouchDoc,
   DesignDocConfiguration,
   isDavenportError,
-  PostPutCopyResponse,
   BulkDocumentError,
   ViewRow,
   ViewRowWithDoc,
-} from '../src/index.js';
+} from '../src/index.ts';
 
-const DB_URL = 'http://localhost:5984';
+let container: StartedCouchDBContainer;
+let DB_URL = 'http://localhost:5984';
 const DB_NAME = 'davenport_tests';
-const OPTIONS: ClientOptions = {
-  // username: "test_admin",
-  // password: "test_password"
-};
+let OPTIONS: ClientOptions = {};
+const CONTAINER_NAME = `davenport-test-${Date.now()}`;
 
 declare const emit: (key: any, value: any) => void;
 
@@ -138,6 +138,17 @@ async function createFoosGreaterThan10(hello: string = 'world') {
 
 describe('Davenport', () => {
   beforeAll(async () => {
+    container = await new CouchDBContainer('couchdb:3.4.2')
+      .withUsername('admin')
+      .withPassword('password')
+      .withName(CONTAINER_NAME)
+      .start();
+    DB_URL = `http://${container.getHost()}:${container.getMappedPort(5984)}`;
+    OPTIONS = {
+      username: 'admin',
+      password: 'password',
+    };
+
     const client = getClient();
     const result = await client.createDb();
     expect(result.ok).toBe(true);
@@ -147,13 +158,20 @@ describe('Davenport', () => {
       foo: 22,
       hello: 'world',
     });
-  }, 10000);
+  }, 120000);
 
   afterAll(async () => {
-    const client = getClient();
-    const result = await client.deleteDb();
-    expect(result.ok).toBe(true);
-  }, 10000);
+    try {
+      const client = getClient();
+      await client.deleteDb();
+    } catch (err) {
+      console.warn('Failed to delete database during cleanup:', err);
+    } finally {
+      if (container) {
+        await container.stop({ remove: true });
+      }
+    }
+  }, 60000);
 
   it('Davenport.createDeleteDb', async () => {
     const dbName = 'davenport_delete_me';
