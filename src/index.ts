@@ -1,6 +1,6 @@
-export * from './client.js';
-export * from './configure.js';
-export * from './error.js';
 export * from './types.js';
-import { Client } from './client.js';
+export * from './client.ts';
+export * from './configure.ts';
+export * from './error.ts';
+import { Client } from './client.ts';
 export default Client;

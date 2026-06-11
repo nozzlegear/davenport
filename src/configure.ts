@@ -1,7 +1,7 @@
-import { Client } from './client.js';
 import { CouchDoc, DatabaseConfiguration, ClientOptions, DesignDoc } from './types.js';
-import { isOkay, warn } from './utils.js';
-import { DavenportError } from './error.js';
+import { Client } from './client.ts';
+import { isOkay, warn } from './utils.ts';
+import { DavenportError } from './error.ts';
 
 /**
  * Configures a Davenport client and database by validating the CouchDB version, creating indexes and design documents, and then returning a client to interact with the database.

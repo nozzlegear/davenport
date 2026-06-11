@@ -16,8 +16,8 @@ import {
   ViewResultWithDocs,
   BasicCouchResponse,
 } from './types.js';
-import { isOkay, warn } from './utils.js';
-import { DavenportError } from './error.js';
+import { isOkay, warn } from './utils.ts';
+import { DavenportError } from './error.ts';
 
 /**
  * A client for interacting with a CouchDB instance. Use this when you don't want or need to use the `configureClient` function to create a database and set up design docs or indexes.
