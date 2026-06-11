@@ -1,5 +1,5 @@
-import { CouchDoc, DatabaseConfiguration, ClientOptions, DesignDoc } from './types.js';
 import { Client } from './client.ts';
+import type { CouchDoc, DatabaseConfiguration, ClientOptions, DesignDoc } from './types.d.ts';
 import { isOkay, warn } from './utils.ts';
 import { DavenportError } from './error.ts';
 

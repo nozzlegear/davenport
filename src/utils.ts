@@ -1,4 +1,4 @@
-import { ClientOptions } from './types.js';
+import type { ClientOptions } from './types.d.ts';
 
 /**
  * Indicates whether the request was a success or not (between 200-300).

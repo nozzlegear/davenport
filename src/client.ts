@@ -1,4 +1,4 @@
-import {
+import type {
   AllDocsListResult,
   BulkResponse,
   ClientOptions,
@@ -15,7 +15,7 @@ import {
   ViewResult,
   ViewResultWithDocs,
   BasicCouchResponse,
-} from './types.js';
+} from './types.d.ts';
 import { isOkay, warn } from './utils.ts';
 import { DavenportError } from './error.ts';
 
