@@ -1,3 +1,4 @@
+import dns from 'node:dns';
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { CouchDBContainer, StartedCouchDBContainer } from '@testcontainers/couchdb';
 
@@ -11,6 +12,8 @@ import Client, {
   ViewRow,
   ViewRowWithDoc,
 } from '../src/index.ts';
+
+dns.setDefaultResultOrder('ipv4first');
 
 let container: StartedCouchDBContainer;
 let DB_URL = 'http://localhost:5984';
