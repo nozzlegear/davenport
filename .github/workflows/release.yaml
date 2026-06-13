@@ -72,6 +72,9 @@ jobs:
           push: true
           github_token: ${{ steps.app-token.outputs.token }}
 
+      - name: Test
+        run: just test
+
       - name: Publish to NPM
         run: just publish-to-npm
 
