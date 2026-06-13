@@ -15,19 +15,15 @@ yarn add davenport
 
 ## Importing
 
-Davenport can be imported via ES6-style default import syntax, or via Node's `require`:
+Davenport is a pure ESM module. It can be imported via ES6-style default import syntax:
 
 ```js
-// ES6
-import Client from "davenport";
-
-// require
-const Client = require("davenport").Client;
+import Client from 'davenport';
 ```
 
 ### Using Davenport in the browser
 
-Davenport can be used in the browser, so long as you transpile the async functions with TypeScript or Babel. Just add the **node_modules/davenport/bin/browser.js** to your web page, and all functions/objects documented below will be available under the `Davenport` variable. 
+Davenport can be used in the browser via a bundler like Vite. It uses the native `fetch` API for all requests.
 
 Make sure your CouchDB installation is [configured to allow cross-origin resource sharing (CORS)](https://wiki.apache.org/couchdb/CORS), otherwise Davenport won't be able to connect!
 
@@ -52,8 +48,8 @@ With promises:
 
 ```js
 const foo = client.get(id).then((shop) => {
-    //Do something with the object.
-}); 
+  //Do something with the object.
+});
 ```
 
 Both methods are supported and the results won't differ. The only difference is an `await`ed method will throw an error if the method fails, where a promise would just fail silently unless you use `.catch`.
@@ -65,12 +61,6 @@ For the sake of being concise, all examples in this doc will use async/await.
 Davenport exports a `configureDatabase` function that can help you create a database, add indexes, set up design documents with views, and then returns a client ready to interact with that database. It will also check that your CouchDB server is at least version 2.0, which is required for many of the functions used by Davenport.
 
 ```js
-// ES6
-import { configureDatabase } from "davenport";
-
-// require
-const configureDatabase = require("davenport").configureDatabase;
-
 // Configure the database with an index on the 'foo' object property, and a view that lists all foos greater than 5.
 const designDoc = {
     name: "list",
@@ -94,26 +84,26 @@ const client = await configureDatabase(DB_URL, {
 You don't need to use the `configureDatabase` function to interact with your database, though. If you have no need for setting up design docs or indexes, just instantiate a new `Client` while passing in a database URL and database name.
 
 ```js
-import Client from "davenport";
+import Client from 'davenport';
 
-const client = new Client(DB_URL, "my-foo-database");
+const client = new Client(DB_URL, 'my-foo-database');
 ```
 
 ## Typescript declarations
 
-Using TypeScript? The TypeScript compiler will automatically pull in Davenport definitions for you when you install Davenport, **as long as you're using TypeScript 2+**. 
+Using TypeScript? The TypeScript compiler will automatically pull in Davenport definitions for you when you install Davenport, **as long as you're using TypeScript 2+**.
 
 Pass your `CouchDoc` extending interface to the `configureDatabase` and `new Client` functions to get full TypeScript support for all client methods:
 
 ```ts
-import Client, { CouchDoc } from "davenport";
+import Client, { CouchDoc } from 'davenport';
 
 interface Foo extends CouchDoc {
-    foo: number,
-    bar: number,
+  foo: number;
+  bar: number;
 }
 
-const client = new Client<Foo>(DB_URL, "my-foo-database");
+const client = new Client<Foo>(DB_URL, 'my-foo-database');
 const myFoo = await client.get(id);
 
 // TypeScript automatically knows that variable `myFoo` is a Foo object.
