@@ -1,6 +1,37 @@
-index.ts
-bin/tests/
-node_modules/
-tsconfig.json
+# Source control
+.git/
+.jj/
+.github/
+.gitignore
+.jjignore
+
+# Build / dev tooling
+justfile
+tsconfig*.json
+vite.config.*
+vitest.config.*
+eslint.config.*
+.prettierrc*
+.prettierignore
+.editorconfig
+.npmrc
+
+# Tests
+tests/
+__tests__/
+**/*.test.ts
+**/*.test.js
+**/*.spec.ts
+**/*.spec.js
+
+# Build outputs / caches
+coverage/
 *.tgz
 *.log
+
+# Editor / OS
+.vscode/
+.idea/
+.claude/
+.DS_Store
+Thumbs.db
