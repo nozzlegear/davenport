@@ -7,6 +7,8 @@ on:
       - '.github/**'
       - 'README.md'
       - 'justfile'
+  pull_request:
+    branches: ["**"]
   workflow_dispatch:
 
 concurrency:
