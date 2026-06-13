@@ -20,8 +20,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint .",
-    "format": "prettier --write .",
-    "prepublishOnly": "npm run build"
+    "format": "prettier --write ."
   },
   "repository": {
     "type": "git",
