@@ -1,13 +1,18 @@
 name: Release Pipeline
-run-name: Publish ${{ inputs.package_version }}
+run-name: Publish ${{ inputs.skip_version_bump && '(current version)' || inputs.package_version }}
 
 on:
   workflow_dispatch:
     inputs:
       package_version:
-        description: 'New package version'
+        description: 'New package version (required unless skipping version bump)'
         type: string
+        required: false
         required: true
+      skip_version_bump:
+        description: 'Skip bumping the version and skip creating a GitHub release (uses version already in package.json)'
+        type: boolean
+        default: false
 
 permissions: {}
 
@@ -52,7 +57,14 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Validate inputs
+        if: ${{ !inputs.skip_version_bump && !inputs.package_version }}
+        run: |
+          echo "::error::package_version is required when skip_version_bump is false."
+          exit 1
+
       - name: Set package version
+        if: ${{ !inputs.skip_version_bump }}
         env:
           PACKAGE_VERSION: ${{ inputs.package_version }}
         run: just set-package-version "$PACKAGE_VERSION"
@@ -76,6 +88,7 @@ jobs:
 
       - name: Publish to NPM
         run: just publish-to-npm
+        if: ${{ inputs.platform == 'both' || inputs.platform == 'npm' }}
 
       - name: Generate artifact attestation
         uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32 # v4.1.0
@@ -84,6 +97,7 @@ jobs:
           subject-path: 'dist/**/*'
 
       - name: Create GitHub release
+        if: ${{ !inputs.skip_version_bump }}
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           PACKAGE_VERSION: ${{ inputs.package_version }}

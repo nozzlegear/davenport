@@ -59,9 +59,16 @@ format:
 set-package-version version:
     npm version "{{version}}" --no-git-tag-version
 
-# Publish to NPM
+# Publish the package to NPM or Github
 [group("release")]
 [script]
-publish-to-npm:
-    npm stage publish
-
+[arg("platform", pattern="npm|github")]
+publish-package platform:
+    if [ "{{platform}}" = "github" ]; then
+        npm pkg set name="@nozzlegear/davenport"
+        # Github does not support provenance or staged publishing at this time
+        npm publish --registry https://npm.pkg.github.com --no-provenance
+    else
+        npm pkg set name="davenport"
+        npm stage publish
+    fi
