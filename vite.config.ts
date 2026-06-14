@@ -17,10 +17,7 @@ export default defineConfig({
     {
       name: 'copy-types',
       closeBundle() {
-        copyFileSync(
-          resolve(__dirname, 'src/types.d.ts'),
-          resolve(__dirname, 'dist/types.d.ts')
-        );
+        copyFileSync(resolve(__dirname, 'src/types.d.ts'), resolve(__dirname, 'dist/types.d.ts'));
       },
     },
   ],
