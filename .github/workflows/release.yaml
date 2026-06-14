@@ -126,7 +126,7 @@ jobs:
       - name: Publish to GitHub Packages
         if: ${{ inputs.platform == 'both' || inputs.platform == 'github' }}
         env:
-          NODE_AUTH_TOKEN: ${{ steps.app-token.outputs.token }}
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: just publish-package github
 
       - name: Generate artifact attestation
